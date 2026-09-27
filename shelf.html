@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Collection Shelf — Joy Trinkets</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <nav>
+      <a class="logo" href="index.html">Joy<span>Trinkets</span></a>
+      <div class="nav-links">
+        <a href="categories.html">Categories</a>
+        <a href="drops.html">Drops</a>
+        <a href="pull.html">Box Pull</a>
+        <a href="shelf.html">Collection</a>
+        <a href="trade.html">Trade</a>
+      </div>
+      <div class="nav-right">
+        <button class="btn btn-outline btn-sm" data-modal="signin">Sign in</button>
+        <button class="icon-btn" data-modal="cart" aria-label="Open cart">🛍<span class="badge-count" id="cartCount">0</span></button>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<section class="page-section panel-block" style="margin-top:40px;">
+  <div class="wrap shelf-panel">
+    <div>
+      <span class="kicker" style="color:#0FA983;">Collection shelf</span>
+      <h2 style="font-size:clamp(26px,3.6vw,36px); margin:12px 0 26px;">Track the set. Spot the chase. Skip the guesswork.</h2>
+      <ul class="feature-list">
+        <li><span class="feature-num">01</span><div><h4>Virtual cabinet</h4><p>Every figure you own is logged automatically, with duplicates and gaps tracked against the full series.</p></div></li>
+        <li><span class="feature-num">02</span><div><h4>True-scale AR preview</h4><p>Use your phone camera to project a figure at real size on your actual shelf before you commit to buying it.</p></div></li>
+        <li><span class="feature-num">03</span><div><h4>Chase figure alerts</h4><p>Get notified the moment a secret or low-count figure from a set you're chasing goes up for trade.</p></div></li>
+      </ul>
+    </div>
+    <div class="shelf-mock">
+      <div class="shelf-mock-head"><b>Wander Series — Vol. 3</b><span style="font-size:13px; color:var(--muted);">8 / 12 owned</span></div>
+      <div class="progress-track"><div class="progress-fill"></div></div>
+      <div class="shelf-row" id="shelfRow"></div>
+      <div class="ar-note">
+        <span style="font-size:18px;">📱</span>
+        <div><b>AR preview ready</b><p>Point your camera at your desk to place the "Walnut Squirrel Family" at true scale before checkout.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="footer-grid">
+      <div>
+        <a class="logo" href="index.html">Joy<span>Trinkets</span></a>
+        <p style="color:var(--muted); font-size:13.5px; margin-top:14px; max-width:260px;">A blind box platform for people who collect on purpose — fair drops, real trades, no guesswork.</p>
+      </div>
+      <div>
+        <h5>Shop</h5>
+        <ul><li><a href="drops.html">New drops</a></li><li><a href="pull.html">Box pull</a></li><li><button data-modal="catalog">Full catalog</button></li></ul>
+      </div>
+      <div>
+        <h5>Collectors</h5>
+        <ul><li><a href="shelf.html">Collection shelf</a></li><li><a href="trade.html">Trade board</a></li><li><button data-modal="rules">Fair drop rules</button></li></ul>
+      </div>
+      <div>
+        <h5>Creators</h5>
+        <ul><li><button data-modal="sell">Sell on Joy Trinkets</button></li><li><button data-modal="antibot">Anti-bot drop tools</button></li><li><button data-modal="contact">Contact us</button></li></ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 Joy Trinkets. All prices in PHP. Product photos are placeholders.</span>
+      <span>Made for collectors, not bots.</span>
+    </div>
+  </div>
+</footer>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-box">
+    <button class="modal-close" id="modalClose">×</button>
+    <div id="modalBody"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="script.js"></script>
+</body>
+</html>

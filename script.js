@@ -127,6 +127,22 @@ function saveCart(){
 }
 let cart = loadCart();
 
+function loadCollection(){
+  try{
+    const collection = JSON.parse(localStorage.getItem('joytrinkets_collection')) || [];
+    return Array.isArray(collection) ? collection : [];
+  }catch(e){ return []; }
+}
+function saveCollection(collection){
+  try{ localStorage.setItem('joytrinkets_collection', JSON.stringify(collection)); }catch(e){ /* ignore */ }
+}
+function addToCollection(item, quantity=1){
+  const collection = loadCollection();
+  const owned = collection.find(entry=> entry.name === item.name);
+  if(owned) owned.qty += quantity;
+  else collection.push({name:item.name, qty:quantity});
+  saveCollection(collection);
+}
 function addToCart(p){
   const line = cart.find(l=> l.name === p.name);
   if(line) line.qty++; else cart.push({name:p.name, price:p.price, qty:1, image:p.image || ''});
@@ -137,6 +153,9 @@ function addToCart(p){
 function updateCartBadge(){
   const el = document.getElementById('cartCount');
   if(el) el.textContent = cart.reduce((s,l)=> s + l.qty, 0);
+}
+function cartItemCount(){
+  return cart.reduce((s,l)=> s + l.qty, 0);
 }
 function cartTotal(){
   return cart.reduce((s,l)=> s + l.price * l.qty, 0);
@@ -171,7 +190,7 @@ function renderCartModal(){
     </div>`).join('');
   openModal(`
     <h3>Your cart</h3>
-    <p class="modal-sub">${cart.reduce((s,l)=>s+l.qty,0)} item(s)</p>
+    <p class="modal-sub">${cartItemCount()} item(s)</p>
     ${lines}
     <div class="cart-total-row"><span>Total</span><span>${peso(cartTotal())}</span></div>
     <button class="btn btn-primary" id="checkoutBtn" style="width:100%; justify-content:center; margin-top:18px;">Checkout</button>`);
@@ -185,30 +204,7 @@ function renderCartModal(){
     });
   });
   const checkoutBtn = body.querySelector('#checkoutBtn');
-  if(checkoutBtn) checkoutBtn.addEventListener('click', renderCheckoutModal);
-}
-
-function renderCheckoutModal(){
-  openModal(`
-    <h3>Checkout</h3>
-    <p class="modal-sub">Demo checkout — no real payment is processed.</p>
-    <div class="form-field"><label>Full name</label><input type="text" placeholder="Juan Dela Cruz"></div>
-    <div class="form-field"><label>Delivery address</label><input type="text" placeholder="Quezon City, Metro Manila"></div>
-    <div class="form-field"><label>Payment method</label><input type="text" placeholder="GCash, Maya, or card"></div>
-    <div class="cart-total-row"><span>Total due</span><span>${peso(cartTotal())}</span></div>
-    <button class="btn btn-primary" id="placeOrderBtn" style="width:100%; justify-content:center; margin-top:18px;">Place order</button>`);
-  const body = document.getElementById('modalBody');
-  body.querySelector('#placeOrderBtn').addEventListener('click', ()=>{
-    const orderId = 'JT-' + Math.floor(10000 + Math.random()*89999);
-    cart = [];
-    saveCart();
-    updateCartBadge();
-    openModal(`
-      <h3>Order placed! 🎉</h3>
-      <p class="modal-sub">Your Joy Trinkets order <b>#${orderId}</b> is confirmed. Track it from your account once you sign in.</p>
-      <button class="btn btn-primary" id="doneBtn" style="width:100%; justify-content:center;">Done</button>`);
-    document.getElementById('modalBody').querySelector('#doneBtn').addEventListener('click', closeModal);
-  });
+  if(checkoutBtn) checkoutBtn.addEventListener('click', ()=>{ location.href = 'checkout.html'; });
 }
 
 function renderSignInModal(){
@@ -310,6 +306,54 @@ document.addEventListener('DOMContentLoaded', ()=>{
   const modalClose = document.getElementById('modalClose');
   if(modalClose) modalClose.addEventListener('click', closeModal);
   if(overlay) overlay.addEventListener('click', e=>{ if(e.target === overlay) closeModal(); });
+
+  /* ---- Page: checkout.html ---- */
+  const checkoutItems = document.getElementById('checkoutItems');
+  if(checkoutItems){
+    const checkoutLayout = document.getElementById('checkoutLayout');
+    const checkoutEmpty = document.getElementById('checkoutEmpty');
+    const orderConfirmation = document.getElementById('orderConfirmation');
+    const checkoutForm = document.getElementById('checkoutForm');
+    const discountRate = 0.10;
+    const discountThreshold = 3;
+
+    function renderCheckoutSummary(){
+      const itemCount = cartItemCount();
+      const subtotal = cartTotal();
+      const discount = itemCount >= discountThreshold ? Math.round(subtotal * discountRate) : 0;
+      checkoutLayout.hidden = itemCount === 0;
+      checkoutEmpty.hidden = itemCount !== 0;
+      checkoutItems.innerHTML = cart.map(item=>`
+        <div class="checkout-item">
+          <div class="checkout-item-image">${item.image ? `<img src="${escAttr(item.image)}" alt="${escAttr(item.name)}" onerror="imgFallback(this)">` : '<span>🎁</span>'}</div>
+          <div class="checkout-item-info"><b>${escAttr(item.name)}</b><span>${peso(item.price)} × ${item.qty}</span></div>
+          <strong>${peso(item.price * item.qty)}</strong>
+        </div>`).join('');
+      document.getElementById('checkoutItemCount').textContent = `${itemCount} item${itemCount === 1 ? '' : 's'}`;
+      document.getElementById('checkoutSubtotal').textContent = peso(subtotal);
+      document.getElementById('checkoutDiscount').textContent = discount ? `−${peso(discount)}` : peso(0);
+      document.getElementById('checkoutTotal').textContent = peso(subtotal - discount);
+      const discountMessage = document.getElementById('discountMessage');
+      discountMessage.textContent = itemCount >= discountThreshold
+        ? '10% bundle discount applied!'
+        : `Add ${discountThreshold - itemCount} more item${discountThreshold - itemCount === 1 ? '' : 's'} for 10% off.`;
+      discountMessage.classList.toggle('discount-applied', itemCount >= discountThreshold);
+    }
+
+    renderCheckoutSummary();
+    checkoutForm.addEventListener('submit', event=>{
+      event.preventDefault();
+      if(!checkoutForm.reportValidity() || cartItemCount() === 0) return;
+      const orderId = 'JT-' + Math.floor(10000 + Math.random()*89999);
+      cart.forEach(item=> addToCollection(item, item.qty));
+      cart = [];
+      saveCart();
+      updateCartBadge();
+      checkoutLayout.hidden = true;
+      orderConfirmation.hidden = false;
+      document.getElementById('orderNumber').textContent = orderId;
+    });
+  }
 
   document.addEventListener('click', e=>{
     const trigger = e.target.closest('[data-modal]');
@@ -498,6 +542,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         const pullResult = {name: picked.name, image: picked.image, rarityClass, rarityLabel};
         daily.results.push(pullResult);
         saveDaily();
+        addToCollection(picked);
         renderResult(pullResult);
         updateCountText();
       }, 500);
@@ -518,23 +563,33 @@ document.addEventListener('DOMContentLoaded', ()=>{
   /* ---- Page: shelf.html ---- */
   const shelfRow = document.getElementById('shelfRow');
   if(shelfRow){
-    const sylvanian = PRODUCTS.filter(p=> p.category === 'sylvanian'); // 12 real sets
-    const ownedCount = 8;
-    const featuredIndex = 1; // Walnut Squirrel Family — matches the AR note below
-    sylvanian.forEach((p,i)=>{
+    const collection = loadCollection();
+    const ownedCount = collection.reduce((total,item)=> total + item.qty, 0);
+    const uniqueCount = collection.filter(item=> item.qty > 0 && PRODUCTS.some(p=> p.name === item.name)).length;
+    document.getElementById('collectionCount').textContent =
+      `${uniqueCount} / ${PRODUCTS.length} unique · ${ownedCount} item${ownedCount === 1 ? '' : 's'} owned`;
+    document.getElementById('collectionProgress').style.width =
+      `${PRODUCTS.length ? uniqueCount / PRODUCTS.length * 100 : 0}%`;
+    PRODUCTS.forEach(p=>{
       const slot = document.createElement('div');
-      const owned = i < ownedCount;
-      slot.className = 'shelf-slot' + (owned ? ' filled' : '') + (i === featuredIndex ? ' chase' : '');
-      slot.title = p.name;
+      const item = collection.find(entry=> entry.name === p.name);
+      const owned = item && item.qty > 0;
+      slot.className = 'shelf-slot' + (owned ? ' filled' : '') + (owned && p.chase ? ' chase' : '');
+      slot.title = `${p.name}${owned ? ` · Qty: ${item.qty}` : ' · Not owned'}`;
+      slot.setAttribute('aria-label', slot.title);
       if(owned){
         slot.style.padding = '0';
         slot.style.overflow = 'hidden';
         slot.innerHTML = placeholderBox(p.name, p.image);
-        if(i === featuredIndex){
+        slot.style.position = 'relative';
+        const quantity = document.createElement('span');
+        quantity.className = 'shelf-quantity';
+        quantity.textContent = `×${item.qty}`;
+        slot.appendChild(quantity);
+        if(p.chase){
           const star = document.createElement('span');
+          star.className = 'shelf-chase-star';
           star.textContent = '★';
-          star.style.cssText = 'position:absolute; top:4px; right:4px; font-size:13px; filter:drop-shadow(0 1px 1px rgba(0,0,0,.4));';
-          slot.style.position = 'relative';
           slot.appendChild(star);
         }
       }

@@ -105,6 +105,16 @@ const PRODUCTS = [
   {name:'Create Your Taste',      category:'twinkle', series:'Twinkle Twinkle', price:790, tag:'tag-new', tagText:'New', image:'https://cdn.ennxo.com/content/uploads/1600/twinkle-twinkle-create-your-taste-series-figures-2.jpg'},
 ];
 
+const PULL_POOL_VERSION = 2;
+const PULL_OFFER_DURATION = 30 * 60 * 1000;
+const PULL_EXCLUSIVES = [
+  {name:'Moonpetal Keeper', series:'Joy Trinkets Vault', price:980, rarityLabel:'Vault Exclusive', rarityClass:'rarity-common', odds:55},
+  {name:'Starlight Parade', series:'Joy Trinkets Vault', price:1280, rarityLabel:'Rare Exclusive', rarityClass:'rarity-rare', odds:30},
+  {name:'Dreamweaver Guardian', series:'Joy Trinkets Vault', price:1680, rarityLabel:'Ultra-Rare Exclusive', rarityClass:'rarity-ultra', odds:12},
+  {name:'Golden Wish Keeper', series:'Joy Trinkets Vault', price:2280, rarityLabel:'Secret Chase', rarityClass:'rarity-secret', odds:3},
+];
+const COLLECTIBLE_PRODUCTS = [...PRODUCTS, ...PULL_EXCLUSIVES];
+
 const BASE_LISTINGS = [
   {name:'Walnut Squirrel Family', desc:'→ for City of Mercy or Let It Be', by:'@roro.crates', time:'2h ago', bg:'#FFE1E8'},
   {name:'Little Mischief',        desc:'x2 dupes → open to offers',       by:'@finchbox',    time:'5h ago', bg:'#FFF3D6'},
@@ -126,6 +136,24 @@ function saveCart(){
   try{ localStorage.setItem('joytrinkets_cart', JSON.stringify(cart)); }catch(e){ /* ignore */ }
 }
 let cart = loadCart();
+
+function getSignedInEmail(){
+  try{
+    return localStorage.getItem('joytrinkets_user') || '';
+  }catch(error){
+    console.error('Could not read the sign-in state.', error);
+    return '';
+  }
+}
+
+function updateSignInButton(){
+  const signedInEmail = getSignedInEmail();
+  document.querySelectorAll('[data-modal="signin"], [data-modal="signout"]').forEach(button=>{
+    button.dataset.modal = signedInEmail ? 'signout' : 'signin';
+    button.textContent = signedInEmail ? 'Sign out' : 'Sign in';
+    button.setAttribute('aria-label', signedInEmail ? `Sign out ${signedInEmail}` : 'Sign in');
+  });
+}
 
 function loadCollection(){
   try{
@@ -210,15 +238,30 @@ function renderCartModal(){
 function renderSignInModal(){
   openModal(`
     <h3>Sign in</h3>
-    <p class="modal-sub">Demo form — no account is actually created.</p>
-    <div class="form-field"><label>Email</label><input type="email" placeholder="you@email.com"></div>
-    <div class="form-field"><label>Password</label><input type="password" placeholder="••••••••"></div>
-    <button class="btn btn-primary" id="loginBtn" style="width:100%; justify-content:center;">Log in</button>
+    <p class="modal-sub">Demo sign-in — any valid email and password unlocks this feature in this browser.</p>
+    <form id="signInForm">
+      <div class="form-field"><label for="signInEmail">Email</label><input id="signInEmail" name="email" type="email" autocomplete="email" placeholder="you@email.com" required></div>
+      <div class="form-field"><label for="signInPassword">Password</label><input id="signInPassword" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required></div>
+      <button class="btn btn-primary" type="submit" style="width:100%; justify-content:center;">Log in</button>
+    </form>
     <p style="text-align:center; font-size:13px; color:var(--muted); margin-top:14px;">No account? <button style="background:none;border:none;color:var(--coral); text-decoration:underline; font-size:13px;" id="signupLink">Sign up</button></p>`);
   const body = document.getElementById('modalBody');
-  body.querySelector('#loginBtn').addEventListener('click', ()=>{
+  body.querySelector('#signInForm').addEventListener('submit', event=>{
+    event.preventDefault();
+    const form = event.currentTarget;
+    if(!form.reportValidity()) return;
+    const email = body.querySelector('#signInEmail').value.trim();
+    try{
+      localStorage.setItem('joytrinkets_user', email);
+    }catch(error){
+      console.error('Could not save the sign-in state.', error);
+      toast('Sign in could not be saved in this browser');
+      return;
+    }
     closeModal();
+    updateSignInButton();
     toast('Signed in (demo)');
+    if(document.getElementById('pullTray')) location.reload();
   });
   body.querySelector('#signupLink').addEventListener('click', ()=> toast('Sign-up flow coming soon'));
 }
@@ -295,6 +338,7 @@ function renderInfoModal(key){
 /* ================= Global click delegation (every page) ================= */
 document.addEventListener('DOMContentLoaded', ()=>{
   updateCartBadge();
+  updateSignInButton();
 
   // highlight the current page in the nav
   const here = location.pathname.split('/').pop() || 'index.html';
@@ -361,6 +405,18 @@ document.addEventListener('DOMContentLoaded', ()=>{
     const type = trigger.dataset.modal;
     if(type === 'cart') renderCartModal();
     else if(type === 'signin') renderSignInModal();
+    else if(type === 'signout'){
+      try{
+        localStorage.removeItem('joytrinkets_user');
+      }catch(error){
+        console.error('Could not clear the sign-in state.', error);
+        toast('Sign out could not be completed');
+        return;
+      }
+      updateSignInButton();
+      toast('Signed out');
+      if(document.getElementById('pullTray')) location.reload();
+    }
     else if(type === 'catalog') renderCatalogModal();
     else if(type === 'listings') renderListingsModal();
     else if(type === 'raffle') renderRaffleModal();
@@ -461,9 +517,21 @@ document.addEventListener('DOMContentLoaded', ()=>{
   /* ---- Page: pull.html — limited to 3 boxes per day ---- */
   const tray = document.getElementById('pullTray');
   if(tray){
+    const vaultOdds = document.getElementById('vaultOdds');
+    vaultOdds.innerHTML = PULL_EXCLUSIVES.map(item=>`
+      <article class="vault-odds-card">
+        <span class="result-rarity ${item.rarityClass}">${escAttr(item.rarityLabel)}</span>
+        <b>${escAttr(item.name)}</b>
+        <span>${item.odds}% chance · ${peso(item.price)}</span>
+      </article>`).join('');
+    const pullPanel = document.getElementById('pullPanel');
+    const signInPrompt = document.getElementById('pullSignInPrompt');
+    if(!getSignedInEmail()){
+      pullPanel.hidden = true;
+      signInPrompt.hidden = false;
+    }else{
     const result = document.getElementById('pullResult');
     const pullCountEl = document.getElementById('pullCount');
-    const pullPool = PRODUCTS.filter(p=> p.tag !== 'tag-soldout');
     const DAILY_LIMIT = 3;
 
     function todayStr(){
@@ -473,7 +541,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
     function loadDaily(){
       let daily;
       try{ daily = JSON.parse(localStorage.getItem('joytrinkets_daily_pull')); }catch(e){ daily = null; }
-      if(!daily || daily.date !== todayStr()) daily = {date: todayStr(), results: []};
+      if(!daily || daily.date !== todayStr() || daily.poolVersion !== PULL_POOL_VERSION){
+        daily = {date: todayStr(), poolVersion: PULL_POOL_VERSION, results: []};
+      }
       return daily;
     }
     let daily = loadDaily();
@@ -500,12 +570,52 @@ document.addEventListener('DOMContentLoaded', ()=>{
         pullCountEl.textContent = `${n} of ${DAILY_LIMIT} boxes opened today`;
       }
     }
+    let offerTimer;
     function renderResult(r){
+      clearInterval(offerTimer);
+      const product = PULL_EXCLUSIVES.find(p=> p.name === r.name);
+      const offerExpiresAt = Number(r.offerExpiresAt) || 0;
+      const offerExpired = offerExpiresAt <= Date.now();
       result.innerHTML = `
         <div class="result-figure">${placeholderBox(r.name, r.image)}</div>
-        <span class="result-rarity ${r.rarityClass}">${r.rarityLabel}</span>
-        <h3 style="font-size:19px; margin-bottom:6px;">${r.name}</h3>
-        <p style="color:var(--muted); font-size:13.5px;">Added to your collection shelf.</p>`;
+        <span class="result-rarity ${escAttr(r.rarityClass)}">${escAttr(r.rarityLabel)}</span>
+        <h3 style="font-size:19px; margin-bottom:6px;">${escAttr(r.name)}</h3>
+        <p class="vault-result-note">${product
+          ? `Vault exclusive · ${product.odds}% pull odds. This reveal is a chance to buy, not an item you own.`
+          : 'This pull came from an older vault and is no longer available to buy.'}</p>
+        ${product ? `
+          <p class="vault-offer-countdown" id="vaultOfferCountdown" role="status"></p>
+          <button class="btn btn-primary" id="addPulledFigure" style="margin-top:12px;" ${offerExpired || r.addedToCart ? 'disabled' : ''}>
+            ${r.addedToCart ? 'Added to cart' : `Add to cart · ${peso(product.price)}`}
+          </button>` : ''}`;
+      const addButton = result.querySelector('#addPulledFigure');
+      const countdown = result.querySelector('#vaultOfferCountdown');
+      if(product && countdown){
+        const updateOfferCountdown = ()=>{
+          const remaining = offerExpiresAt - Date.now();
+          if(remaining <= 0){
+            countdown.textContent = 'This 30-minute offer has expired.';
+            if(addButton) addButton.disabled = true;
+            return false;
+          }
+          const minutes = Math.floor(remaining / 60000);
+          const seconds = Math.floor((remaining % 60000) / 1000);
+          countdown.textContent = `Offer ends in ${minutes}:${String(seconds).padStart(2, '0')}`;
+          return true;
+        };
+        updateOfferCountdown();
+        offerTimer = setInterval(()=>{
+          if(!updateOfferCountdown()) clearInterval(offerTimer);
+        }, 1000);
+      }
+      if(addButton) addButton.addEventListener('click', ()=>{
+        if(Date.now() >= offerExpiresAt || r.addedToCart) return;
+        addToCart(product);
+        r.addedToCart = true;
+        saveDaily();
+        addButton.disabled = true;
+        addButton.textContent = 'Added to cart';
+      });
     }
     function buildTray(){
       tray.innerHTML = '';
@@ -534,15 +644,20 @@ document.addEventListener('DOMContentLoaded', ()=>{
         box.classList.add('opened');
         box.textContent = '✓';
         box.disabled = true;
-        const picked = pullPool[Math.floor(Math.random()*pullPool.length)];
-        const r = Math.random();
-        const rarity = r < 0.06 ? 'secret' : r < 0.30 ? 'rare' : 'common';
-        const rarityClass = rarity === 'secret' ? 'rarity-secret' : rarity === 'rare' ? 'rarity-rare' : 'rarity-common';
-        const rarityLabel = rarity === 'secret' ? '✨ Secret chase' : rarity === 'rare' ? 'Rare' : 'Common';
-        const pullResult = {name: picked.name, image: picked.image, rarityClass, rarityLabel};
+        const roll = Math.random() * 100;
+        let cumulativeOdds = 0;
+        const picked = PULL_EXCLUSIVES.find(item=>{
+          cumulativeOdds += item.odds;
+          return roll < cumulativeOdds;
+        });
+        const pullResult = {
+          name:picked.name,
+          rarityClass:picked.rarityClass,
+          rarityLabel:picked.rarityLabel,
+          offerExpiresAt:Date.now() + PULL_OFFER_DURATION,
+        };
         daily.results.push(pullResult);
         saveDaily();
-        addToCollection(picked);
         renderResult(pullResult);
         updateCountText();
       }, 500);
@@ -558,6 +673,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
       if(el) el.textContent = formatCountdown(msUntilNextTray());
     }, 1000);
     buildTray();
+    }
   }
 
   /* ---- Page: shelf.html ---- */
@@ -565,12 +681,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
   if(shelfRow){
     const collection = loadCollection();
     const ownedCount = collection.reduce((total,item)=> total + item.qty, 0);
-    const uniqueCount = collection.filter(item=> item.qty > 0 && PRODUCTS.some(p=> p.name === item.name)).length;
+    const uniqueCount = collection.filter(item=> item.qty > 0 && COLLECTIBLE_PRODUCTS.some(p=> p.name === item.name)).length;
     document.getElementById('collectionCount').textContent =
-      `${uniqueCount} / ${PRODUCTS.length} unique · ${ownedCount} item${ownedCount === 1 ? '' : 's'} owned`;
+      `${uniqueCount} / ${COLLECTIBLE_PRODUCTS.length} unique · ${ownedCount} item${ownedCount === 1 ? '' : 's'} owned`;
     document.getElementById('collectionProgress').style.width =
-      `${PRODUCTS.length ? uniqueCount / PRODUCTS.length * 100 : 0}%`;
-    PRODUCTS.forEach(p=>{
+      `${COLLECTIBLE_PRODUCTS.length ? uniqueCount / COLLECTIBLE_PRODUCTS.length * 100 : 0}%`;
+    COLLECTIBLE_PRODUCTS.forEach(p=>{
       const slot = document.createElement('div');
       const item = collection.find(entry=> entry.name === p.name);
       const owned = item && item.qty > 0;

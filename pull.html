@@ -32,11 +32,16 @@
 <section class="page-section panel-block" style="margin-top:40px;">
   <div class="wrap">
     <div class="pull-head">
-      <span class="kicker">Gamified box pull</span>
-      <h2>Pick your box from the tray</h2>
-      <p style="color:var(--muted); margin-top:12px;">Just 3 boxes a day, real odds. Tap a box to give it a shake — what's inside is yours the moment it opens. A fresh tray unlocks every midnight.</p>
+      <span class="kicker">The Joy Trinkets Vault</span>
+      <h2>Pull something you can't find in the catalog</h2>
+      <p style="color:var(--muted); margin-top:12px;">Three free pulls a day from our vault-only figures. Every reveal is a chance to buy, not an automatic purchase. See the exact odds and price before you pull; each offer lasts 30 minutes.</p>
     </div>
-    <div class="pull-panel">
+    <div class="pull-auth-prompt" id="pullSignInPrompt" hidden>
+      <h3>Sign in to pull a box</h3>
+      <p>Box pulls are available to signed-in collectors.</p>
+      <button class="btn btn-primary" data-modal="signin">Sign in</button>
+    </div>
+    <div class="pull-panel" id="pullPanel">
       <div class="pull-tray" id="pullTray"></div>
       <div>
         <div class="pull-result" id="pullResult">
@@ -44,6 +49,12 @@
         </div>
         <p class="pull-count" id="pullCount">0 of 3 boxes opened today</p>
       </div>
+    </div>
+    <div class="vault-odds">
+      <h3>Vault exclusives &amp; exact odds</h3>
+      <p>Each pull selects one of these exclusive figures. Odds are per pull.</p>
+      <div class="vault-odds-grid" id="vaultOdds"></div>
+      <p class="vault-demo-note">Demo vault: figures, odds, offer timers, and cart checkout are prototypes; no stock is reserved.</p>
     </div>
   </div>
 </section>

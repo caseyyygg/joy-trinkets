@@ -14,13 +14,14 @@
   <div class="wrap">
     <nav>
       <a class="logo" href="index.html">Joy<span>Trinkets</span></a>
-      <div class="nav-links">
+      <div class="nav-links" id="primaryNav">
         <a href="categories.html">Categories</a>
         <a href="drops.html">Drops</a>
         <a href="pull.html">Box Pull</a>
         <a href="shelf.html">Collection</a>
         <a href="trade.html">Trade</a>
       </div>
+      <button class="nav-toggle" type="button" data-nav-toggle aria-controls="primaryNav" aria-expanded="false" aria-label="Open navigation"><span class="nav-toggle-lines" aria-hidden="true"></span></button>
       <div class="nav-right">
         <button class="btn btn-outline btn-sm" data-modal="signin">Sign in</button>
         <button class="icon-btn" data-modal="cart" aria-label="Open cart">🛍<span class="badge-count" id="cartCount">0</span></button>
@@ -29,12 +30,22 @@
   </div>
 </header>
 
+<section class="trust-bar" aria-label="Collector assurances">
+  <div class="wrap trust-grid">
+    <div class="trust-item"><span class="trust-check">✓</span>100% Authentic Sealed Boxes</div>
+    <div class="trust-item"><span class="trust-check">✓</span>Tracked Nationwide PH Shipping</div>
+    <div class="trust-item"><span class="trust-check">✓</span>Escrow-Protected Trades</div>
+    <div class="trust-item"><span class="trust-check">✓</span>Anti-Bot Fair Drops</div>
+  </div>
+</section>
+
 <section class="page-section">
   <div class="wrap">
     <div class="drop-toolbar">
       <div class="section-head" style="margin-bottom:0;">
         <span class="kicker">New drops</span>
         <h2>This week's series</h2>
+        <p class="section-description">Choose a series to browse its figures, rarity details, and pull odds.</p>
       </div>
       <div class="filter-pills" id="filterPills">
         <button class="filter-pill active" data-filter="all">All</button>
@@ -57,7 +68,7 @@
     <div class="footer-grid">
       <div>
         <a class="logo" href="index.html">Joy<span>Trinkets</span></a>
-        <p style="color:var(--muted); font-size:13.5px; margin-top:14px; max-width:260px;">A blind box platform for people who collect on purpose — fair drops, real trades, no guesswork.</p>
+        <p style="color:var(--muted); font-size:13.5px; margin-top:14px; max-width:260px;">Thoughtfully curated collectibles, clear prices, and a collector-first shopping experience.</p>
       </div>
       <div>
         <h5>Shop</h5>
@@ -73,7 +84,7 @@
       </div>
     </div>
     <div class="footer-bottom">
-      <span>© 2026 Joy Trinkets. All prices in PHP. Product photos are placeholders.</span>
+      <span>© 2026 Joy Trinkets. Prices in PHP. Delivery options and shipping fees are confirmed during order review.</span>
       <span>Made for collectors, not bots.</span>
     </div>
   </div>

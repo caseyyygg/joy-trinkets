@@ -14,13 +14,14 @@
   <div class="wrap">
     <nav>
       <a class="logo" href="index.html">Joy<span>Trinkets</span></a>
-      <div class="nav-links">
+      <div class="nav-links" id="primaryNav">
         <a href="categories.html">Categories</a>
         <a href="drops.html">Drops</a>
         <a href="pull.html">Box Pull</a>
         <a href="shelf.html">Collection</a>
         <a href="trade.html">Trade</a>
       </div>
+      <button class="nav-toggle" type="button" data-nav-toggle aria-controls="primaryNav" aria-expanded="false" aria-label="Open navigation"><span class="nav-toggle-lines" aria-hidden="true"></span></button>
       <div class="nav-right">
         <button class="btn btn-outline btn-sm" data-modal="signin">Sign in</button>
         <button class="icon-btn" data-modal="cart" aria-label="Open cart">🛍<span class="badge-count" id="cartCount">0</span></button>
@@ -34,7 +35,7 @@
     <div class="checkout-heading">
       <span class="kicker">Almost yours</span>
       <h1>Checkout</h1>
-      <p>Review your trinkets and add your delivery details.</p>
+      <p>Review your items, delivery details, and payment preference.</p>
     </div>
 
     <div class="checkout-layout" id="checkoutLayout" hidden>
@@ -42,7 +43,11 @@
         <form id="checkoutForm">
           <div class="checkout-form-section">
             <h2>Delivery details</h2>
-            <p class="checkout-note">Demo checkout — no real payment is processed.</p>
+            <p class="checkout-note">Order details and payment preference</p>
+            <div class="checkout-assurance">Order protection: review your order before confirming. Card details are not requested or stored on this page.</div>
+            <div class="payment-badges" aria-label="Accepted payment methods">
+              <span>GCash</span><span>Maya</span><span>Card</span><span>COD</span>
+            </div>
             <div class="form-field">
               <label for="checkoutName">Full name</label>
               <input id="checkoutName" name="name" type="text" autocomplete="name" placeholder="Juan Dela Cruz" required>
@@ -66,7 +71,7 @@
               </select>
             </div>
           </div>
-          <button class="btn btn-primary checkout-submit" type="submit">Place demo order</button>
+          <button class="btn btn-primary checkout-submit" type="submit">Create order summary</button>
         </form>
       </section>
 
@@ -80,9 +85,11 @@
         <div class="checkout-totals">
           <div><span>Subtotal</span><span id="checkoutSubtotal"></span></div>
           <div><span>Bundle discount</span><span id="checkoutDiscount"></span></div>
-          <div class="checkout-grand-total"><strong>Total</strong><strong id="checkoutTotal"></strong></div>
+          <div class="checkout-shipping"><span>Shipping</span><span id="checkoutShipping">Confirmed after address review</span></div>
+          <div class="checkout-grand-total"><strong>Items total</strong><strong id="checkoutTotal"></strong></div>
         </div>
-        <p class="checkout-fine-print">Buy 3 or more items to get 10% off your item subtotal.</p>
+        <p class="checkout-fine-print">Buy 3 or more items to get 10% off your item subtotal. Shipping is confirmed after your delivery address is reviewed.</p>
+        <p class="checkout-preview-note">This storefront preview does not transmit orders or collect payments.</p>
       </aside>
     </div>
 
@@ -94,10 +101,10 @@
     </section>
 
     <section class="order-confirmation" id="orderConfirmation" hidden>
-      <div class="icon-badge">🎉</div>
-      <span class="kicker">It's official</span>
-      <h2>Order placed!</h2>
-      <p>Your demo order <strong id="orderNumber"></strong> is confirmed. Thanks for shopping with Joy Trinkets!</p>
+      <div class="icon-badge">✓</div>
+      <span class="kicker">Order preview</span>
+      <h2>Order summary ready</h2>
+      <p>Your local order preview <strong id="orderNumber"></strong> is ready. No order has been transmitted or charged, and your cart is still available.</p>
       <a class="btn btn-primary" href="drops.html">Keep browsing</a>
     </section>
   </div>
@@ -106,7 +113,7 @@
 <footer>
   <div class="wrap">
     <div class="footer-bottom">
-      <span>© 2026 Joy Trinkets. All prices in PHP. Demo checkout only.</span>
+      <span>© 2026 Joy Trinkets. Prices in PHP. This storefront preview does not collect payments.</span>
       <a href="index.html">Back to Joy Trinkets</a>
     </div>
   </div>

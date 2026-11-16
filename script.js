@@ -23,7 +23,7 @@ function escAttr(str){
 function imgFallback(img){
   const div = document.createElement('div');
   div.className = 'img-placeholder';
-  div.innerHTML = '<span>⚠️ Image failed to load</span>';
+  div.innerHTML = '<span class="placeholder-brand">JOY<br>TRINKETS</span><span>Collector photo unavailable</span>';
   img.replaceWith(div);
 }
 
@@ -31,7 +31,7 @@ function placeholderBox(label, imageUrl){
   if(imageUrl){
     return `<img class="product-photo" src="${escAttr(imageUrl)}" alt="${escAttr(label)}" onerror="imgFallback(this)">`;
   }
-  return `<div class="img-placeholder"><span>🖼 ${label}<br>Add photo</span></div>`;
+  return `<div class="img-placeholder"><span class="placeholder-brand">JOY<br>TRINKETS</span><span>${escAttr(label)}</span></div>`;
 }
 
 /* ================= Shared data ================= */
@@ -39,91 +39,150 @@ function placeholderBox(label, imageUrl){
    every category card shows exactly as many series as actually exist in PRODUCTS.
    Series names are real, released lines from each brand (not invented). */
 const CATEGORIES = [
-  {id:'sylvanian', name:'Sylvanian Families', count:'12 sets', icon:'🏡', bg:'#FFE1E8', image:'https://wallpaperaccess.com/full/12265707.jpg'},
-  {id:'hirono',     name:'Hirono',             count:'8 sets',  icon:'🌙', bg:'#EFE7FF', image:'https://wallpapercave.com/wp/wp13689077.jpg'},
-  {id:'crybaby',    name:'Crybaby',            count:'7 sets',  icon:'💧', bg:'#E3F0FF', image:'https://prod-eurasian-res.popmart.com/default/16_oK4KL5lBhg_1200x1200.jpg'},
-  {id:'pucky',      name:'Pucky',              count:'5 sets',  icon:'🐰', bg:'#FFF3D6', image:'https://prod-eurasian-res.popmart.com/default/%E5%9C%BA%E6%99%AF1_SazKShm6TQ_1200x1200.jpg'},
-  {id:'zsiga',      name:'Zsiga',              count:'4 sets',  icon:'🦋', bg:'#E1F9F1', image:'https://tse3.mm.bing.net/th/id/OIP.95C84mNDbpT9uYZ7Oz8hngHaHa?r=0&pid=Api&h=220&P=0'},
-  {id:'twinkle',    name:'Twinkle Twinkle',    count:'6 sets',  icon:'⭐', bg:'#FFE9DC', image:'https://tse1.mm.bing.net/th/id/OIP.6XUVNUP0vF8NRHOEdHOI1QHaFE?r=0&pid=Api&h=220&P=0'},
+  {id:'sylvanian', name:'Sylvanian Families', count:'3 sets', icon:'⌂', bg:'#F7E7E8', image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/8711915031349.jpg'},
+  {id:'hirono', name:'Hirono', count:'3 sets', icon:'◌', bg:'#EEE9F5', image:'https://prod-america-res.popmart.com/default/20231102_173452_687387__1200x1200.jpg'},
+  {id:'psyduck', name:'Psyduck', count:'1 set', icon:'◡', bg:'#F8EED7', image:'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/54.png'},
+  {id:'crybaby', name:'Crybaby', count:'3 sets', icon:'♡', bg:'#F8E7EA', image:'https://prod-eurasian-res.popmart.com/default/16_oK4KL5lBhg_1200x1200.jpg'},
+  {id:'twinkle', name:'Twinkle Twinkle', count:'3 sets', icon:'✦', bg:'#F5EBDD', image:'https://m.media-amazon.com/images/I/71eEjXaUYfL._AC_SL1500_.jpg'},
+  {id:'smiskis', name:'Smiskis', count:'3 sets', icon:'☼', bg:'#E9EFE8', image:'https://smiski.com/e/wp-content/uploads/2018/08/image.png'},
 ];
 
-/* `chase` is the real secret/hidden figure documented for that series, where one exists.
-   Used to power the "Secret chase" filter instead of a per-item tag. */
+function makeCharacters(names, category, series, secretName, characterImages, seriesImage){
+  const seriesSlug = `${category}-${series}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const characterImage = (name, index)=>{
+    const suppliedImage = characterImages && characterImages[index];
+    if(suppliedImage && suppliedImage !== seriesImage) return suppliedImage;
+    const characterSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    return `images/characters/${seriesSlug}/${characterSlug}.jpg`;
+  };
+  if(names.length && typeof names[0] === 'object'){
+    return names.map(character=>({
+      name:character.name,
+      rarity:character.rarity,
+      odds:character.odds,
+      image:character.image || '',
+    }));
+  }
+  return [
+    ...names.map((name, index)=>({
+      name,
+      rarity:'Standard',
+      odds:'1/12',
+      image:characterImage(name, index),
+    })),
+    {name:secretName, rarity:'Secret Chase', odds:'1/144', image:characterImage(secretName, names.length)},
+  ];
+}
+
+function makeSeries({name, category, series, price, tag, tagText, heightCm, image, chase, characters, characterImages}){
+  return {
+    name, category, series, price, tag, tagText, heightCm, image, chase,
+    characters:makeCharacters(characters, category, series, chase, characterImages, image),
+  };
+}
+
 const PRODUCTS = [
-  // Sylvanian Families — 12
-  {name:'Chocolate Rabbit Family',  category:'sylvanian', series:'Sylvanian Families', price:950,  tag:'tag-new',     tagText:'New', image:'https://legacydistribution.it/cdn/shop/files/5jbx8twikwogwnwmzk4zz1yyuodz6v8n_1_2048x2048.jpg?v=1759235424'},
-  {name:'Walnut Squirrel Family',   category:'sylvanian', series:'Sylvanian Families', price:890,  tag:'tag-low',     tagText:'Low stock', image:'https://busybeetoys.net/cdn/shop/files/Calico-Critters-Walnut-squirrel-family-CC2299-busy-bee-toys_01_800x664.png?v=1775494557'},
-  {name:'Persian Cat Family',       category:'sylvanian', series:'Sylvanian Families', price:1090, tag:'tag-new',     tagText:'New', image:'https://toyshoppe.co.uk/wp-content/uploads/2025/10/sylvanian-families-persian-cat-family-set-1.jpg'},
-  {name:'Cottontail Rabbit Family', category:'sylvanian', series:'Sylvanian Families', price:780,  tag:'tag-new',     tagText:'New', image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/8711915031349.jpg'},
-  {name:'Bramble Hedgehog Family',  category:'sylvanian', series:'Sylvanian Families', price:820,  tag:'tag-low',     tagText:'Low stock', image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/5054131040188_uk.jpg'},
-  {name:'Marshmallow Mouse Family', category:'sylvanian', series:'Sylvanian Families', price:760,  tag:'tag-new',     tagText:'New', image:'https://tse2.mm.bing.net/th/id/OIP.H8xdfCp8ZMchDJ-D-q9EvwHaD1?r=0&pid=Api&h=220&P=0'},
-  {name:'Yellow Labrador Family',   category:'sylvanian', series:'Sylvanian Families', price:980,  tag:'tag-soldout', tagText:'Sold out', image:'https://www.donalds.co.uk/wp-content/uploads/2022/10/5182-1.jpg'},
-  {name:'Striped Cat Family',       category:'sylvanian', series:'Sylvanian Families', price:840,  tag:'tag-new',     tagText:'New', image:'https://cdn.shopify.com/s/files/1/1885/4211/products/5180_StripedCatFamily_CC.jpg?v=1606403734'},
-  {name:'Maple Cat Family',         category:'sylvanian', series:'Sylvanian Families', price:900,  tag:'tag-low',     tagText:'Low stock', image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/5290_01_Maple_Cat_Family.jpg'},
-  {name:'Springer Kangaroo Family', category:'sylvanian', series:'Sylvanian Families', price:1050, tag:'tag-new',     tagText:'New', image:'https://sylvanianstorekeepers.com/cdn/shop/files/4766c_pr284_4_14adc644-259f-4f20-a87f-583c270e13fb.jpg?v=1722947195'},
-  {name:'Toy Poodle Family',        category:'sylvanian', series:'Sylvanian Families', price:970,  tag:'tag-new',     tagText:'New', image:'https://luksusbaby.com.cn/cdn/shop/products/5259-2.jpg?v=1709218469&width=1500'},
-  {name:'Tuxedo Cat Family',        category:'sylvanian', series:'Sylvanian Families', price:860,  tag:'tag-low',     tagText:'Low stock', image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/5054131051818_uk.jpg'},
+  makeSeries({name:'Baby Seashore Friends Series', category:'sylvanian', series:'Baby Seashore Friends Series', price:420, tag:'tag-new', tagText:'New', heightCm:4.5, image:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSd0E3uBVTVizb6J25exHm4l7JM3qD-D5SHhoNekMgTetZROFUkLhtAVclW&s=10', chase:'Allie Fennec with a crown', characters:['Nicola Splashy with crab hat','Jason Osborne in lobster costume','Owen Periwinkle with whale toy','Sandy Neptune with shell messenger bag','Amber Husky with fish wand','Sophie Snow with fish handbag','Ryan Persian with turtle backpack'], characterImages:['https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2447_1684221335832.jpg','https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2447_1684221290790.jpg','https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2447_1684221327472.jpg','https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2447_1684221314816.jpg','https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2447_1684221303042.jpg','https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2447_1684221320376.jpg','https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2447_1684221308939.jpg','https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2447_1684221342664.jpg']}),
+  makeSeries({name:'Baby Forest Costume Series', category:'sylvanian', series:'Baby Forest Costume Series', price:420, tag:'tag-low', tagText:'Low stock', heightCm:4.5, image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2528_1702876192457.jpg', chase:'Peppermint Marlowe with leaf mask', characters:[
+    {name:'Perri Buckley in an apple costume', rarity:'Standard', odds:'1/12', image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2528_1702876205185.jpg'},
+    {name:'Gilly Golightly in a mushroom costume', rarity:'Standard', odds:'1/12', image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2528_1702876215847.jpg'},
+    {name:'Ambrose Walnut in an acorn outfit', rarity:'Standard', odds:'1/12', image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2528_1702876229647.jpg'},
+    {name:'Mary Marshmallow with a leaf raft', rarity:'Standard', odds:'1/12', image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2528_1702876239377.jpg'},
+    {name:'Julie Outback in a ladybird outfit', rarity:'Standard', odds:'1/12', image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2528_1702876252180.jpg'},
+    {name:'Drake Husky with a green leaf accessory', rarity:'Standard', odds:'1/12', image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2528_1702876276461.jpg'},
+    {name:'Flora Chocolate with a lily of the valley accessory', rarity:'Standard', odds:'1/12', image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2528_1702876290163.jpg'},
+    {name:'Peppermint Marlowe with leaf mask', rarity:'Secret Chase', odds:'1/144', image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2528_1702876303098.jpg'},
+  ]}),
+  makeSeries({name:'Baby Treats Series', category:'sylvanian', series:'Baby Treats Series', price:420, tag:'tag-new', tagText:'New', heightCm:4.5, image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2276_1639379953292.jpg', chase:'Sandy Neptune with madeleine', characters:[
+    {name:'Adelaide Outback with koala ice cream', rarity:'Standard', odds:'1/12', image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2276_1639380049780.jpg'},
+    {name:'Perri Buckley with deer lollipop', rarity:'Standard', odds:'1/12', image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2276_1639380053868.jpg'},
+    {name:'Andy Snow with rabbit waffle', rarity:'Standard', odds:'1/12', image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2276_1639379959183.jpg'},
+    {name:'Scott Sandy with cat muffin', rarity:'Standard', odds:'1/12', image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2276_1639379968045.jpg'},
+    {name:'Clara Pookie with panda pancake', rarity:'Standard', odds:'1/12', image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2276_1639380046153.jpg'},
+    {name:'Bradley Osborne with bear bagel', rarity:'Standard', odds:'1/12', image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2276_1639379963790.jpg'},
+    {name:'Albert Marshmallow with mouse cake', rarity:'Standard', odds:'1/12', image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2276_1639380058055.jpg'},
+    {name:'Sandy Neptune with madeleine', rarity:'Secret Chase', odds:'1/144', image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2276_1639380062511.jpg'},
+  ]}),
+  makeSeries({name:'Hirono The Other One', category:'hirono', series:'The Other One', price:780, tag:'tag-new', tagText:'New', heightCm:8.5, image:'https://m.media-amazon.com/images/I/71h6xW8QCpL.jpg', chase:'The Monster', characters:[
+    {name:'The Ghost', rarity:'Standard', odds:'1/12', image:'https://hironoworld.com/wp-content/uploads/2025/01/hirono-the-ghost-main-300x300.png.webp'},
+    {name:'The Fox', rarity:'Standard', odds:'1/12', image:'https://hironoworld.com/wp-content/uploads/2025/01/hirono-the-fox-main-300x300.png.webp'},
+    {name:'The Crow', rarity:'Standard', odds:'1/12', image:'https://hironoworld.com/wp-content/uploads/2025/01/hirono-the-crow-main-300x300.png.webp'},
+    {name:'The Monster', rarity:'Standard', odds:'1/12', image:'https://hironoworld.com/wp-content/uploads/2025/01/hirono-the-monster-main-300x300.png.webp'},
+    {name:'Marionette', rarity:'Standard', odds:'1/12', image:'https://hironoworld.com/wp-content/uploads/2025/01/hirono-marioneta-main-300x300.png.webp'},
+    {name:'Amnesia', rarity:'Standard', odds:'1/12', image:'https://hironoworld.com/wp-content/uploads/2025/01/hirono-amnesia-main-300x300.png.webp'},
+    {name:'Staring', rarity:'Standard', odds:'1/12', image:'https://hironoworld.com/wp-content/uploads/2025/01/hirono-staring-main-300x300.png.webp'},
+    {name:'Nowhere Safe', rarity:'Standard', odds:'1/12', image:'https://hironoworld.com/wp-content/uploads/2025/01/hirono-nowhere-safe-main-300x300.png.webp'},
+    {name:'Cuckoo', rarity:'Standard', odds:'1/12', image:'https://hironoworld.com/wp-content/uploads/2025/01/hirono-cuckoo-main-300x300.png.webp'},
+    {name:'Being Alive', rarity:'Standard', odds:'1/12', image:'https://hironoworld.com/wp-content/uploads/2025/01/hirono-being-alive-main-300x300.png.webp'},
+    {name:'Raving', rarity:'Standard', odds:'1/12', image:'https://hironoworld.com/wp-content/uploads/2025/01/hirono-raving-main-300x300.png.webp'},
+    {name:'Vagrancy', rarity:'Standard', odds:'1/12', image:'https://hironoworld.com/wp-content/uploads/2025/01/hirono-vagrancy-main-300x300.png.webp'},
+    {name:'Dreaming', rarity:'Secret Chase', odds:'1/144', image:'https://hironoworld.com/wp-content/uploads/2025/01/hirono-dreaming-main-300x300.png.webp'},
+  ]}),
+  makeSeries({name:'Hirono City of Mercy', category:'hirono', series:'City of Mercy', price:850, tag:'tag-low', tagText:'Low stock', heightCm:8.5, image:'https://www.thetoychronicle.com/wp-content/uploads/2022/12/POP-MART-x-Inner-Flow-Hirono-City-of-Mercy-Blind-Box-Series-758x398.jpg', chase:'Belonging', characters:[
+    {name:'Fallen Angel', rarity:'Standard', odds:'1/12', image:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRc-dmOlXGzPP0Dz7k7HMpEg-bRejCK27n_XmZN2yCjUQ&s=10'},
+    {name:'Comfortably Numb', rarity:'Standard', odds:'1/12', image:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR1USMjbhoTq8DNqH3QSJVOY2bG39VtGlCCggQ72hHnYA&s=10'},
+    {name:'Healer', rarity:'Standard', odds:'1/12', image:'https://hironoworld.com/wp-content/uploads/2025/01/healer-main-150x150.webp'},
+    {name:'Insight', rarity:'Standard', odds:'1/12', image:'https://hironoworld.com/wp-content/uploads/2025/01/insught-main-150x150.webp'},
+    {name:'The Other', rarity:'Standard', odds:'1/12', image:'https://hironoworld.com/wp-content/uploads/2025/01/the-other-main-150x150.webp'},
+    {name:'Echo', rarity:'Standard', odds:'1/12', image:'https://hironoworld.com/wp-content/uploads/2025/01/echo-main-150x150.webp'},
+    {name:'Belonging', rarity:'Secret Chase', odds:'1/144', image:'https://hironoworld.com/wp-content/uploads/2025/01/belonging-main-150x150.webp'},
+  ]}),
+  makeSeries({name:'Hirono Reshape', category:'hirono', series:'Reshape', price:900, tag:'tag-new', tagText:'New', heightCm:8.5, image:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRwRDBP6RQOl8cCMgmomvhAxpF2cCmuRSQizgqkHzJ1wA&s=10', chase:'Puppet', characters:[
+    {name:'Healing', rarity:'Standard', odds:'1/12', image:'https://prod-global-biz.popmart.com/globalAdmin/1785916086463_c81e728d9d4c2f636f067f89cc14862c.jpg?x-oss-process=image/resize,w_1600/quality,q_90/format,avif'},
+    {name:'Paradise Lost', rarity:'Standard', odds:'1/12', image:'https://prod-global-biz.popmart.com/globalAdmin/1789099092186_c4ca4238a0b923820dcc509a6f75849b.jpg?x-oss-process=image/resize,w_1600/quality,q_90/format,avif'},
+    {name:'Drowning', rarity:'Standard', odds:'1/12', image:'https://prod-global-biz.popmart.com/globalAdmin/1789099065193_c9f0f895fb98ab9159f51fd0297e236d.jpg?x-oss-process=image/resize,w_1600/quality,q_90/format,avif'},
+    {name:'Costume', rarity:'Standard', odds:'1/12', image:'https://prod-global-biz.popmart.com/globalAdmin/1789099078532_e4da3b7fbbce2345d7772b0674a318d5.jpg?x-oss-process=image/resize,w_1600/quality,q_90/format,avif'},
+    {name:'Parasite', rarity:'Standard', odds:'1/12', image:'https://prod-global-biz.popmart.com/globalAdmin/1789099096616_eccbc87e4b5ce2fe28308fd9f2a7baf3.jpg?x-oss-process=image/resize,w_1600/quality,q_90/format,avif'},
+    {name:'Voyage', rarity:'Standard', odds:'1/12', image:'https://prod-global-biz.popmart.com/globalAdmin/1789099083678_8f14e45fceea167a5a36dedd4bea2543.jpg?x-oss-process=image/resize,w_1600/quality,q_90/format,avif'},
+    {name:'Burst', rarity:'Standard', odds:'1/12', image:'https://prod-global-biz.popmart.com/globalAdmin/1789099087883_45c48cce2e2d7fbdea1afc51c7c6ad26.jpg?x-oss-process=image/resize,w_1600/quality,q_90/format,avif'},
+    {name:'Fading', rarity:'Standard', odds:'1/12', image:'https://prod-global-biz.popmart.com/globalAdmin/1789099070364_a87ff679a2f3e71d9181a67b7542122c.jpg?x-oss-process=image/resize,w_1600/quality,q_90/format,avif'},
+    {name:'Woodcarving', rarity:'Standard', odds:'1/12', image:'https://prod-global-biz.popmart.com/globalAdmin/1789099105710_1679091c5a880faf6fb5e6087eb1b2dc.jpg?x-oss-process=image/resize,w_1600/quality,q_90/format,avif'},
+    {name:'Puppet', rarity:'Secret Chase', odds:'1/144', image:'https://prod-global-biz.popmart.com/globalAdmin/1789099110024_d3d9446802a44259755d38e6d163e820.jpg?x-oss-process=image/resize,w_1600/quality,q_90/format,avif'},
+  ]}),
 
-  // Hirono — 8
-  {name:'The Other One',      category:'hirono', series:'Hirono', price:780, tag:'tag-new',     tagText:'New',      chase:'The Monster', image:'https://prod-america-res.popmart.com/default/20231102_173452_687387__1200x1200.jpg'},
-  {name:'Little Mischief',    category:'hirono', series:'Hirono', price:780, tag:'tag-low',     tagText:'Low stock', image:'https://down-ph.img.susercontent.com/file/cn-11134207-7r98o-lza6e277lroz56'},
-  {name:'City of Mercy',      category:'hirono', series:'Hirono', price:850, tag:'tag-new',     tagText:'New',      chase:'Belonging', image:'https://down-ph.img.susercontent.com/file/th-11134207-7qul0-lk0z8wrf4ls9e4'},
-  {name:'Mime',               category:'hirono', series:'Hirono', price:820, tag:'tag-low',     tagText:'Low stock', image:'https://m.media-amazon.com/images/I/71Ni+LiSCfL._AC_SL1500_.jpg'},
-  {name:'Reshape',            category:'hirono', series:'Hirono', price:900, tag:'tag-new',     tagText:'New', image:'https://prod-eurasian-res.popmart.com/default/20240313_110520_855074__1200x1251.jpg?x-oss-process=image/format,webp'},
-  {name:'Shelter',            category:'hirono', series:'Hirono', price:950, tag:'tag-new',     tagText:'New',      chase:'Stuffed Bear', image:'https://down-my.img.susercontent.com/file/cn-11134207-7r98o-lzsujv7vfxirf4'},
-  {name:'Echo',               category:'hirono', series:'Hirono', price:990, tag:'tag-soldout', tagText:'Sold out', image:'https://down-ph.img.susercontent.com/file/sg-11134275-7rept-m8egxe9ocoide6'},
-  {name:"Monsters' Carnival", category:'hirono', series:'Hirono', price:870, tag:'tag-new',     tagText:'New',      chase:'The Disembodies', image:'https://blindboxcollections.com/cdn/shop/files/CoffeeBreak-18.png?v=1760696735'},
+  makeSeries({name:'Psyduck Figure Collection', category:'psyduck', series:'Pokémon Figure Collection', price:890, tag:'tag-new', tagText:'New', heightCm:7.5, image:'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/54.png', chase:'Shiny Psyduck', characters:[
+    {name:'Daydreaming Psyduck', rarity:'Standard', odds:'1/12', image:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTFKfkuHdeXg6wkkrjraleynt9cjqOWFZThj5I48NXSTNicip6g3piSRkio&s=10L'},
+    {name:'Headache Psyduck', rarity:'Standard', odds:'1/12', image:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRs_ALPD8OveSOZYzShy3NrZCf76TMa4FmNFdUrPe825A&s'},
+    {name:'Surprised Psyduck', rarity:'Standard', odds:'1/12', image:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSfwgCSM_ObQZp6cg22n5J2TFktg4QylJs-JWOETwdWtxR1n-874082NC6Y&s=10'},
+    {name:'Shiny Psyduck', rarity:'Secret Chase', odds:'1/144', image:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTzIIRz59pt70sf9XoxEyeej5RsIDUvYoYoGhGXHD1u6LW14Rn0JZik0ZP-&s=10'},
+  ]}),
 
-  // Crybaby — 7
-  {name:'Monster Tears',        category:'crybaby', series:'Crybaby', price:780, tag:'tag-new',     tagText:'New',      chase:'Moth Queen', image:'https://down-my.img.susercontent.com/file/cn-11134207-7r98o-lz627es7pcpudf'},
-  {name:'Wild but Cutie',       category:'crybaby', series:'Crybaby', price:750, tag:'tag-low',     tagText:'Low stock', chase:'Wild Cutie', image:'https://down-my.img.susercontent.com/file/cn-11134207-7ras8-m9qqk7v3nonm07'},
-  {name:'Crying Again',         category:'crybaby', series:'Crybaby', price:820, tag:'tag-new',     tagText:'New', image:'https://down-ph.img.susercontent.com/file/cn-11134207-7ras8-m0leadz4njrbdc'},
-  {name:'Crying to the Moon',   category:'crybaby', series:'Crybaby', price:790, tag:'tag-low',     tagText:'Low stock', image:'https://down-my.img.susercontent.com/file/cn-11134208-820l4-mi2op27o03yc91'},
-  {name:'Crying for Love',      category:'crybaby', series:'Crybaby', price:860, tag:'tag-new',     tagText:'New', image:'https://down-my.img.susercontent.com/file/cn-11134207-7ras8-m58ibwvxashnc7'},
-  {name:'Crying in the Woods',  category:'crybaby', series:'Crybaby', price:810, tag:'tag-soldout', tagText:'Sold out', image:'https://crybabyworld.com/wp-content/uploads/2025/03/Crying-In-The-Woods-Series.jpg'},
-  {name:'Tears Launch Project', category:'crybaby', series:'Crybaby', price:830, tag:'tag-new',     tagText:'New',      chase:'Tear Jerker', image:'https://prod-america-res.popmart.com/default/20260213_103535_413934____2_crybaby-tears-launch-project-series-plush-pendant-blind-box_plush-toys_details_pop-mart-us_____1200x1348.jpg?x-oss-process=image/format,webp'},
+  // TODO: Replace generated character image paths with individual photos for each series.
+  makeSeries({name:'Crybaby Crying Again', category:'crybaby', series:'Crying Again', price:820, tag:'tag-new', tagText:'New', heightCm:9, image:'https://down-ph.img.susercontent.com/file/cn-11134207-7ras8-m0leadz4njrbdc', chase:'Crying Again Secret', characters:['Crying Again - Blue','Crying Again - Pink','Crying Again - Yellow','Crying Again - Green','Crying Again - Purple','Crying Again - White']}),
+  makeSeries({name:'Crybaby Wild but Cutie', category:'crybaby', series:'Wild but Cutie', price:750, tag:'tag-low', tagText:'Low stock', heightCm:9, image:'https://down-my.img.susercontent.com/file/cn-11134207-7ras8-m9qqk7v3nonm07', chase:'Wild Cutie', characters:['Bunny','Bear','Fox','Tiger','Deer','Lamb']}),
+  makeSeries({name:'Crybaby Monster Tears', category:'crybaby', series:'Monster Tears', price:780, tag:'tag-soldout', tagText:'Sold out', heightCm:9, image:'https://down-my.img.susercontent.com/file/cn-11134207-7r98o-lz627es7pcpudf', chase:'Moth Queen', characters:['Monster Tears - Blue','Monster Tears - Pink','Monster Tears - Yellow','Monster Tears - Green','Monster Tears - Purple','Monster Tears - White']}),
 
-  // Pucky — 5
-  {name:'Sleeping Babies',  category:'pucky', series:'Pucky', price:890, tag:'tag-new',     tagText:'New',      chase:'Little Moon Baby', image:'https://tse3.mm.bing.net/th/id/OIP.79X1uV_dgfsJsShG0mPxvQHaHa?r=0&pid=Api&h=220&P=0'},
-  {name:'Forest Elf',       category:'pucky', series:'Pucky', price:850, tag:'tag-low',     tagText:'Low stock', chase:'Batcat Fairy', image:'https://down-th.img.susercontent.com/file/sg-11134201-7rdyn-m0jpfuyfa2dg71'},
-  {name:'Forest Party',     category:'pucky', series:'Pucky', price:900, tag:'tag-new',     tagText:'New', image:'https://prod-eurasian-res.popmart.com/default/20230928_102627_637666__1200x1200.jpg'},
-  {name:'Sleeping Forest',  category:'pucky', series:'Pucky', price:950, tag:'tag-soldout', tagText:'Sold out',  chase:'Lotus', image:'https://1.bp.blogspot.com/-j_4tHy5ghec/ZjcuVmFcUjI/AAAAAAACVlM/ExHu-JZB47Q-vVk4UtDZDG1C5CWwoW8SgCNcBGAsYHQ/s1600/Sleeping-Forest-Series-Pucky-Pop-Mart-Figure-2.jpg'},
-  {name:'Flying Babies',    category:'pucky', series:'Pucky', price:870, tag:'tag-new',     tagText:'New', image:'https://d2cva83hdk3bwc.cloudfront.net/pop-mart-pucky-flying-babies-series-single-box-2.jpg'},
+  // TODO: Replace generated character image paths with individual photos for each series.
+  makeSeries({name:'Twinkle Twinkle Savor the Moment', category:'twinkle', series:'Savor the Moment', price:830, tag:'tag-new', tagText:'New', heightCm:8, image:'https://m.media-amazon.com/images/I/71eEjXaUYfL._AC_SL1500_.jpg', chase:'Matcha Cream Snow', characters:['Sweet Morning','Little Picnic','Quiet Afternoon','Warm Embrace','Evening Wish','Sunday Stroll']}),
+  makeSeries({name:'Twinkle Twinkle A Big Hug for You', category:'twinkle', series:'A Big Hug for You', price:810, tag:'tag-low', tagText:'Low stock', heightCm:8, image:'https://i.ebayimg.com/images/g/f7oAAeSw9MtorHa5/s-l1600.webp', chase:'The Best Gift', characters:['A Big Hug','Tiny Gift','Warm Wishes','Sweet Dreams','Little Star','Long Embrace']}),
+  makeSeries({name:'Twinkle Twinkle Be a Little Star', category:'twinkle', series:'Be a Little Star', price:900, tag:'tag-new', tagText:'New', heightCm:8, image:'https://down-ph.img.susercontent.com/file/cn-11134207-7ras8-m8gal17u0h7h95', chase:'Reach for the Stars', characters:['Starry Night','Moonbeam','Wish Maker','Cloud Nine','Shining Bright','Starlight']}),
 
-  // Zsiga — 4
-  {name:'Let It Be',      category:'zsiga', series:'Zsiga', price:780, tag:'tag-new',     tagText:'New',      chase:'Moment of Peace', image:'https://prod-eurasian-res.popmart.com/default/20240614_141433_544280_____05_____1200x1212.jpg?x-oss-process=image/format,webp'},
-  {name:'We All Are Kids',category:'zsiga', series:'Zsiga', price:800, tag:'tag-low',     tagText:'Low stock', image:'https://prod-eurasian-res.popmart.com/default/20240919_141512_656152_____04_____1200x1117.jpg?x-oss-process=image/format,webp'},
-  {name:"We're So Cute",  category:'zsiga', series:'Zsiga', price:760, tag:'tag-new',     tagText:'New',      chase:'Bear in the Window', image:'https://d2cva83hdk3bwc.cloudfront.net/pop-mart-zsiga-we-re-so-cute-series-figures-gift-set-1.jpg'},
-  {name:'Twins',          category:'zsiga', series:'Zsiga', price:820, tag:'tag-soldout', tagText:'Sold out', image:'https://media.okini.land/174020-large_default/popmart-zsiga-twins-series-box-9-pieces.jpg'},
-
-  // Twinkle Twinkle — 6
-  {name:'Savor the Moment',       category:'twinkle', series:'Twinkle Twinkle', price:830, tag:'tag-new', tagText:'New',      chase:'Matcha Cream Snow', image:'https://m.media-amazon.com/images/I/71eEjXaUYfL._AC_SL1500_.jpg'},
-  {name:'A Big Hug for You',      category:'twinkle', series:'Twinkle Twinkle', price:810, tag:'tag-low', tagText:'Low stock', chase:'The Best Gift', image:'https://i.ebayimg.com/images/g/f7oAAeSw9MtorHa5/s-l1600.webp'},
-  {name:'We Are Twinkle Twinkle', category:'twinkle', series:'Twinkle Twinkle', price:850, tag:'tag-new', tagText:'New',      chase:'The Master of Chill', image:'https://down-th.img.susercontent.com/file/cn-11134207-7r98o-lyygo8h71pir2d'},
-  {name:'Be a Little Star',       category:'twinkle', series:'Twinkle Twinkle', price:900, tag:'tag-new', tagText:'New',      chase:'Reach for the Stars', image:'https://blindboxcollections.com/cdn/shop/files/IMG_2855.heic?v=1747560066'},
-  {name:'1.2.3! Twinkle Twinkle', category:'twinkle', series:'Twinkle Twinkle', price:780, tag:'tag-low', tagText:'Low stock', image:'https://down-ph.img.susercontent.com/file/cn-11134207-7ras8-m8gal17u0h7h95'},
-  {name:'Create Your Taste',      category:'twinkle', series:'Twinkle Twinkle', price:790, tag:'tag-new', tagText:'New', image:'https://cdn.ennxo.com/content/uploads/1600/twinkle-twinkle-create-your-taste-series-figures-2.jpg'},
+  // Smiski — official blind-box series; each has six designs and a rare secret.
+  // TODO: Add individual Secret Smiski image URLs to each Smiski characterImages list.
+  makeSeries({name:'Smiski Living Series', category:'smiskis', series:'Living Series', price:590, tag:'tag-new', tagText:'New', heightCm:6.5, image:'https://smiski.com/e/wp-content/uploads/2018/08/05.png', chase:'Secret Smiski', characters:['Daydreaming','Playing','Hiding','Nap Time','Thinking','Lifting'], characterImages:['https://smiski.com/e/wp-content/uploads/2018/08/05.png','https://smiski.com/e/wp-content/uploads/2018/08/04.png','https://smiski.com/e/wp-content/uploads/2018/08/02.png','https://smiski.com/e/wp-content/uploads/2018/08/03.png','https://smiski.com/e/wp-content/uploads/2018/08/01.png','https://smiski.com/e/wp-content/uploads/2018/08/06.png']}),
+  makeSeries({name:'Smiski Bed Series', category:'smiskis', series:'Bed Series', price:590, tag:'tag-low', tagText:'Low stock', heightCm:6.5, image:'https://smiski.com/e/wp-content/uploads/2019/07/img_bed_products_01.png', chase:'Secret Smiski', characters:['Before Rest','Sleepy','Co-sleeping','Reading','At Sleep','Fussing'], characterImages:['https://smiski.com/e/wp-content/uploads/2019/07/img_bed_products_01.png','https://smiski.com/e/wp-content/uploads/2019/07/img_bed_products_02.png','https://smiski.com/e/wp-content/uploads/2019/07/img_bed_products_03.png','https://smiski.com/e/wp-content/uploads/2019/07/img_bed_products_04.png','https://smiski.com/e/wp-content/uploads/2019/07/img_bed_products_05.png','https://smiski.com/e/wp-content/uploads/2019/07/img_bed_products_06.png']}),
+  makeSeries({name:'Smiski Yoga Series', category:'smiskis', series:'Yoga Series', price:590, tag:'tag-new', tagText:'New', heightCm:6.5, image:'https://smiski.com/e/wp-content/uploads/2019/09/img_yoga_01.png', chase:'Secret Smiski', characters:['Lotus Pose','Twist Pose','Shouldstand Pose','Triangle Pose','Tree Pose','Ship Pose'], characterImages:['https://smiski.com/e/wp-content/uploads/2019/09/img_yoga_01.png','https://smiski.com/e/wp-content/uploads/2019/09/img_yoga_02.png','https://smiski.com/e/wp-content/uploads/2019/09/img_yoga_03.png','https://smiski.com/e/wp-content/uploads/2019/09/img_yoga_04.png','https://smiski.com/e/wp-content/uploads/2019/09/img_yoga_05.png','https://smiski.com/e/wp-content/uploads/2019/09/img_yoga_06.png']}),
 ];
 
 const PULL_POOL_VERSION = 2;
 const PULL_OFFER_DURATION = 30 * 60 * 1000;
 const PULL_EXCLUSIVES = [
-  {name:'Moonpetal Keeper', series:'Joy Trinkets Vault', price:980, rarityLabel:'Vault Exclusive', rarityClass:'rarity-common', odds:55},
-  {name:'Starlight Parade', series:'Joy Trinkets Vault', price:1280, rarityLabel:'Rare Exclusive', rarityClass:'rarity-rare', odds:30},
-  {name:'Dreamweaver Guardian', series:'Joy Trinkets Vault', price:1680, rarityLabel:'Ultra-Rare Exclusive', rarityClass:'rarity-ultra', odds:12},
-  {name:'Golden Wish Keeper', series:'Joy Trinkets Vault', price:2280, rarityLabel:'Secret Chase', rarityClass:'rarity-secret', odds:3},
+  {name:'Moonpetal Keeper', series:'Joy Trinkets Vault', price:980, rarityLabel:'Vault Exclusive', rarityClass:'rarity-common', odds:55, heightCm:7},
+  {name:'Starlight Parade', series:'Joy Trinkets Vault', price:1280, rarityLabel:'Rare Exclusive', rarityClass:'rarity-rare', odds:30, heightCm:7},
+  {name:'Dreamweaver Guardian', series:'Joy Trinkets Vault', price:1680, rarityLabel:'Ultra-Rare Exclusive', rarityClass:'rarity-ultra', odds:12, heightCm:7},
+  {name:'Golden Wish Keeper', series:'Joy Trinkets Vault', price:2280, rarityLabel:'Secret Chase', rarityClass:'rarity-secret', odds:3, heightCm:7},
 ];
 const COLLECTIBLE_PRODUCTS = [...PRODUCTS, ...PULL_EXCLUSIVES];
 
 const BASE_LISTINGS = [
-  {name:'Walnut Squirrel Family', desc:'→ for City of Mercy or Let It Be', by:'@roro.crates', time:'2h ago', bg:'#FFE1E8'},
-  {name:'Little Mischief',        desc:'x2 dupes → open to offers',       by:'@finchbox',    time:'5h ago', bg:'#FFF3D6'},
-  {name:'Crying Again',           desc:'→ for any Monster Tears chase',   by:'@minttape',    time:'1d ago', bg:'#E1F9F1'},
+  {name:'Baby Seashore Friends Series', desc:'→ open to offers for another Sylvanian baby series', by:'@roro.crates', time:'2h ago', bg:'#FFE1E8'},
+  {name:'Hirono The Other One', desc:'x2 dupes → open to offers', by:'@finchbox', time:'5h ago', bg:'#FFF3D6'},
+  {name:'Crybaby Crying Again', desc:'→ open to offers for another Crybaby series', by:'@minttape', time:'1d ago', bg:'#E1F9F1'},
 ];
 const EXTRA_LISTINGS = [
-  {name:'Let It Be',      desc:'→ looking for the Chocolate Rabbit Family', by:'@shelfshelf', time:'1d ago', bg:'#FFE9DC'},
-  {name:'Be a Little Star', desc:'Chase pulled → offers only',              by:'@pinkboxpe',  time:'2d ago', bg:'#EFE7FF'},
-  {name:'Sleeping Babies',  desc:'x3 dupes → will bundle',                  by:'@collectph',  time:'3d ago', bg:'#E3F0FF'},
+  {name:'Smiski Yoga Series', desc:'→ looking for another Smiski series', by:'@shelfshelf', time:'1d ago', bg:'#FFE9DC'},
+  {name:'Twinkle Twinkle Be a Little Star', desc:'Chase pulled → offers only', by:'@pinkboxpe', time:'2d ago', bg:'#EFE7FF'},
+  {name:'Psyduck Figure Collection', desc:'x3 dupes → will bundle', by:'@collectph', time:'3d ago', bg:'#E3F0FF'},
 ];
 
 /* ================= Cart (persisted across pages) ================= */
@@ -136,6 +195,8 @@ function saveCart(){
   try{ localStorage.setItem('joytrinkets_cart', JSON.stringify(cart)); }catch(e){ /* ignore */ }
 }
 let cart = loadCart();
+const BUNDLE_DISCOUNT_THRESHOLD = 3;
+const BUNDLE_DISCOUNT_RATE = 0.10;
 
 function getSignedInEmail(){
   try{
@@ -194,12 +255,184 @@ function openModal(html){
   const overlay = document.getElementById('modalOverlay');
   const body = document.getElementById('modalBody');
   if(!overlay || !body) return;
+  stopScaleCamera();
   body.innerHTML = html;
+  const modalBox = overlay.querySelector('.modal-box');
+  if(modalBox) modalBox.classList.toggle('modal-box-wide', Boolean(body.querySelector('.character-viewer, .scale-viewer')));
   overlay.classList.add('open');
 }
+let activeCameraStream = null;
+let cameraRequestVersion = 0;
+let activeCharacterProduct = null;
+let activeCharacterIndex = 0;
+
 function closeModal(){
+  stopScaleCamera();
   const overlay = document.getElementById('modalOverlay');
   if(overlay) overlay.classList.remove('open');
+}
+
+function stopScaleCamera(){
+  cameraRequestVersion++;
+  if(activeCameraStream){
+    activeCameraStream.getTracks().forEach(track=>track.stop());
+    activeCameraStream = null;
+  }
+  const body = document.getElementById('modalBody');
+  if(body){
+    const video = body.querySelector('[data-camera-video]');
+    if(video) video.srcObject = null;
+    const stage = body.querySelector('[data-camera-stage]');
+    if(stage) stage.hidden = true;
+    const start = body.querySelector('[data-camera-start]');
+    if(start){
+      start.hidden = false;
+      start.disabled = false;
+      start.textContent = 'Start camera';
+    }
+    const sizeControl = body.querySelector('[data-camera-size-control]');
+    if(sizeControl) sizeControl.hidden = true;
+    const fallback = body.querySelector('[data-camera-fallback]');
+    if(fallback) fallback.hidden = true;
+  }
+}
+
+function figureHeightText(heightCm){
+  return `${heightCm.toFixed(1)} cm / ${(heightCm / 2.54).toFixed(1)} in`;
+}
+
+function renderCharacterModal(product, index=0){
+  activeCharacterProduct = product;
+  activeCharacterIndex = (index + product.characters.length) % product.characters.length;
+  const character = product.characters[activeCharacterIndex];
+  openModal(`
+    <div class="character-viewer">
+      <div class="character-viewer-heading"><div><span class="kicker">${escAttr(product.series)}</span><h3>${escAttr(product.name)}</h3></div><span class="character-count">${activeCharacterIndex + 1} of ${product.characters.length}</span></div>
+      <div class="character-main">
+        <button class="viewer-arrow" type="button" data-character-prev aria-label="Previous character">←</button>
+        <div class="character-image-wrap">${placeholderBox(character.name, character.image)}</div>
+        <button class="viewer-arrow" type="button" data-character-next aria-label="Next character">→</button>
+      </div>
+      <div class="character-info">
+        <h4>${escAttr(character.name)}</h4><span class="rarity-badge ${character.rarity === 'Secret Chase' ? 'rarity-secret' : 'rarity-common'}">${escAttr(character.rarity)}</span>
+        <p>Pull odds <b>${escAttr(character.odds)}</b> <span class="character-height">· ${figureHeightText(product.heightCm)}</span></p>
+        <div class="character-thumbnails" aria-label="Choose a character">${product.characters.map((item, itemIndex)=>`<button type="button" class="character-thumb ${itemIndex === activeCharacterIndex ? 'active' : ''}" data-character-index="${itemIndex}" aria-label="View ${escAttr(item.name)}">${placeholderBox(item.name, item.image)}</button>`).join('')}</div>
+        <div class="character-actions"><button class="btn btn-primary" type="button" data-character-add ${product.tag === 'tag-soldout' ? 'disabled' : ''}>Add Blind Box to Cart</button><button class="btn btn-outline" type="button" data-size-preview>📏 See on hand / actual size</button></div>
+      </div>
+    </div>`);
+  const body = document.getElementById('modalBody');
+  body.querySelector('[data-character-prev]').addEventListener('click', ()=>renderCharacterModal(product, activeCharacterIndex - 1));
+  body.querySelector('[data-character-next]').addEventListener('click', ()=>renderCharacterModal(product, activeCharacterIndex + 1));
+  body.querySelectorAll('[data-character-index]').forEach(button=>button.addEventListener('click', ()=>renderCharacterModal(product, Number(button.dataset.characterIndex))));
+  const addButton = body.querySelector('[data-character-add]');
+  if(addButton) addButton.addEventListener('click', ()=>addToCart(product));
+  body.querySelector('[data-size-preview]').addEventListener('click', ()=>renderScalePreview(product, character));
+}
+
+function renderScalePreview(product, character){
+  stopScaleCamera();
+  const heightCm = product.heightCm || 6.5;
+  const figureName = character ? character.name : product.name;
+  const figureImage = character ? character.image : product.image;
+  openModal(`
+    <div class="scale-viewer">
+      <span class="kicker">True-scale preview</span><h3>${escAttr(character ? character.name : product.name)}</h3>
+      <p class="modal-sub">Figure height: <b>${figureHeightText(heightCm)}</b></p>
+      <div class="scale-tabs" role="tablist"><button class="scale-tab active" type="button" data-scale-tab="objects" role="tab" aria-selected="true">In-Hand &amp; Object Scale</button><button class="scale-tab" type="button" data-scale-tab="camera" role="tab" aria-selected="false">Live Camera Hand Overlay</button></div>
+      <section class="scale-panel" data-scale-panel="objects">
+        <div class="object-scale-controls"><label for="scaleObject">Compare with</label><select id="scaleObject"><option value="18">Open Palm (18 cm)</option><option value="14.7">Smartphone (14.7 cm)</option><option value="2.7">₱10 Coin (2.7 cm)</option></select></div>
+        <div class="object-scale-stage">
+          <div class="scale-ruler" style="height:${heightCm}cm"><span>${heightCm} cm</span></div>
+          <div class="scale-figure" style="height:${heightCm}cm">${placeholderBox(character ? character.name : product.name, character ? character.image : product.image)}</div>
+          <div class="scale-object palm" data-object-visual style="height:18cm; --object-height:18cm; --object-width:8.1cm"><span>Open Palm · 18 cm</span></div>
+        </div>
+        <p class="scale-disclaimer">Displayed at proportional CSS scale. Actual physical size on screen varies by device, display settings, and zoom.</p>
+      </section>
+      <section class="scale-panel camera-panel" data-scale-panel="camera" hidden>
+        <p class="camera-help">Allow camera access, then hold your palm up to compare the figure size.</p>
+        <button class="btn btn-outline camera-start" type="button" data-camera-start>Start camera</button>
+        <div class="camera-stage" data-camera-stage hidden><video data-camera-video autoplay playsinline muted></video><div class="camera-figure" data-camera-figure aria-label="${escAttr(figureName)}">${placeholderBox(figureName, figureImage)}</div><p class="camera-fallback" data-camera-fallback hidden></p></div>
+        <label class="camera-size-control" data-camera-size-control hidden>Figure size <input type="range" min="40" max="420" value="${Math.round(heightCm * 38)}" data-camera-size></label>
+        <p class="scale-disclaimer">Camera preview is local to this device. Physical sizing may vary with camera distance and display settings.</p>
+      </section>
+    </div>`);
+  const body = document.getElementById('modalBody');
+  const objectSelect = body.querySelector('#scaleObject');
+  const objectVisual = body.querySelector('[data-object-visual]');
+  objectSelect.addEventListener('change', ()=>{
+    const cm = Number(objectSelect.value);
+    objectVisual.style.height = `${cm}cm`;
+    objectVisual.style.setProperty('--object-height', `${cm}cm`);
+    objectVisual.style.setProperty('--object-width', `${cm * (cm === 2.7 ? 1 : 0.48)}cm`);
+    objectVisual.classList.toggle('palm', cm === 18);
+    objectVisual.classList.toggle('phone', cm === 14.7);
+    objectVisual.classList.toggle('coin', cm === 2.7);
+    objectVisual.querySelector('span').textContent = `${objectSelect.options[objectSelect.selectedIndex].text}`;
+  });
+  body.querySelectorAll('[data-scale-tab]').forEach(tab=>tab.addEventListener('click', async ()=>{
+    stopScaleCamera();
+    body.querySelectorAll('[data-scale-tab]').forEach(item=>{
+      const active = item === tab;
+      item.classList.toggle('active', active);
+      item.setAttribute('aria-selected', String(active));
+    });
+    body.querySelectorAll('[data-scale-panel]').forEach(panel=>panel.hidden = panel.dataset.scalePanel !== tab.dataset.scaleTab);
+    if(tab.dataset.scaleTab === 'camera') await startScaleCamera(body, character, product);
+  }));
+}
+
+async function startScaleCamera(body, character, product){
+  const requestVersion = ++cameraRequestVersion;
+  const start = body.querySelector('[data-camera-start]');
+  const stage = body.querySelector('[data-camera-stage]');
+  const video = body.querySelector('[data-camera-video]');
+  const fallback = body.querySelector('[data-camera-fallback]');
+  const sizeControl = body.querySelector('[data-camera-size-control]');
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    stage.hidden = false;
+    fallback.hidden = false;
+    fallback.textContent = 'Camera preview is not available in this browser or connection. Try a secure HTTPS page or use the object scale tab.';
+    return;
+  }
+  start.disabled = true;
+  start.textContent = 'Requesting camera…';
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({video:true});
+    const overlay = document.getElementById('modalOverlay');
+    const cameraPanel = body.querySelector('[data-scale-panel="camera"]');
+    if(requestVersion !== cameraRequestVersion || !body.isConnected || !overlay.classList.contains('open') || !cameraPanel || cameraPanel.hidden){
+      stream.getTracks().forEach(track=>track.stop());
+      return;
+    }
+    activeCameraStream = stream;
+    video.srcObject = stream;
+    stage.hidden = false;
+    sizeControl.hidden = false;
+    start.hidden = true;
+    const figure = body.querySelector('[data-camera-figure]');
+    const slider = body.querySelector('[data-camera-size]');
+    slider.addEventListener('input', ()=>figure.style.height = `${slider.value}px`);
+    let dragging = false;
+    figure.addEventListener('pointerdown', event=>{ dragging = true; figure.setPointerCapture(event.pointerId); });
+    figure.addEventListener('pointerup', ()=>dragging = false);
+    figure.addEventListener('pointercancel', ()=>dragging = false);
+    figure.addEventListener('pointermove', event=>{
+      if(!dragging) return;
+      const rect = stage.getBoundingClientRect();
+      figure.style.left = `${Math.max(0, Math.min(100, (event.clientX - rect.left) / rect.width * 100))}%`;
+      figure.style.top = `${Math.max(0, Math.min(100, (event.clientY - rect.top) / rect.height * 100))}%`;
+    });
+  }catch(error){
+    if(requestVersion !== cameraRequestVersion) return;
+    console.warn('Camera access was unavailable for the size preview.', error);
+    stage.hidden = false;
+    fallback.hidden = false;
+    fallback.textContent = error.name === 'NotAllowedError'
+      ? 'Camera permission was declined. You can enable it in your browser settings, or use the object scale tab.'
+      : 'The camera could not be started. Check that it is available and try again, or use the object scale tab.';
+    start.disabled = false;
+    start.textContent = 'Try camera again';
+  }
 }
 
 function renderCartModal(){
@@ -210,6 +443,9 @@ function renderCartModal(){
       <a class="btn btn-primary" href="drops.html" style="width:100%; justify-content:center;">Browse drops</a>`);
     return;
   }
+  const itemCount = cartItemCount();
+  const subtotal = cartTotal();
+  const discount = itemCount >= BUNDLE_DISCOUNT_THRESHOLD ? Math.round(subtotal * BUNDLE_DISCOUNT_RATE) : 0;
   const lines = cart.map(l=> `
     <div class="cart-line">
       <div class="cart-line-figure" style="background:var(--surface-2); display:flex; align-items:center; justify-content:center; overflow:hidden;">${l.image ? `<img src="${escAttr(l.image)}" alt="${escAttr(l.name)}" style="width:100%; height:100%; object-fit:cover;" onerror="imgFallback(this)">` : '<span style="font-size:10px; color:var(--muted); text-align:center;">img</span>'}</div>
@@ -218,10 +454,17 @@ function renderCartModal(){
     </div>`).join('');
   openModal(`
     <h3>Your cart</h3>
-    <p class="modal-sub">${cartItemCount()} item(s)</p>
+    <p class="modal-sub">${itemCount} item${itemCount === 1 ? '' : 's'} · packed with care</p>
     ${lines}
-    <div class="cart-total-row"><span>Total</span><span>${peso(cartTotal())}</span></div>
-    <button class="btn btn-primary" id="checkoutBtn" style="width:100%; justify-content:center; margin-top:18px;">Checkout</button>`);
+    <div class="cart-totals">
+      <div><span>Subtotal</span><span>${peso(subtotal)}</span></div>
+      <div><span>Bundle discount</span><span>${discount ? `−${peso(discount)}` : peso(0)}</span></div>
+      <div class="cart-total-row"><strong>Items total</strong><strong>${peso(subtotal - discount)}</strong></div>
+    </div>
+    <p class="cart-shipping-note">Shipping is confirmed after your delivery address is reviewed.</p>
+    <p class="cart-protection-note">Order protection: review your order before confirming. Payment details are never stored here.</p>
+    <div class="payment-badges cart-payment-badges" aria-label="Payment methods available"><span>GCash</span><span>Maya</span><span>Card</span><span>COD</span></div>
+    <button class="btn btn-primary" id="checkoutBtn" style="width:100%; justify-content:center; margin-top:18px;">Continue to checkout</button>`);
   const body = document.getElementById('modalBody');
   body.querySelectorAll('[data-remove]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
@@ -350,6 +593,50 @@ document.addEventListener('DOMContentLoaded', ()=>{
   const modalClose = document.getElementById('modalClose');
   if(modalClose) modalClose.addEventListener('click', closeModal);
   if(overlay) overlay.addEventListener('click', e=>{ if(e.target === overlay) closeModal(); });
+  document.addEventListener('keydown', event=>{
+    const characterViewerOpen = document.querySelector('#modalOverlay.open #modalBody .character-viewer');
+    if(activeCharacterProduct && characterViewerOpen && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)){
+      if(event.key === 'ArrowLeft'){
+        event.preventDefault();
+        renderCharacterModal(activeCharacterProduct, activeCharacterIndex - 1);
+      }else if(event.key === 'ArrowRight'){
+        event.preventDefault();
+        renderCharacterModal(activeCharacterProduct, activeCharacterIndex + 1);
+      }
+    }
+    if(event.key === 'Escape'){
+      document.querySelectorAll('.nav-links.open').forEach(nav=>{
+        nav.classList.remove('open');
+        const toggle = document.querySelector(`[aria-controls="${nav.id}"]`);
+        if(toggle){
+          toggle.setAttribute('aria-expanded', 'false');
+          toggle.setAttribute('aria-label', 'Open navigation');
+        }
+      });
+      closeModal();
+    }
+  });
+
+  document.querySelectorAll('[data-nav-toggle]').forEach(toggle=>{
+    toggle.addEventListener('click', ()=>{
+      const nav = document.getElementById(toggle.getAttribute('aria-controls'));
+      const isOpen = toggle.getAttribute('aria-expanded') === 'true';
+      toggle.setAttribute('aria-expanded', String(!isOpen));
+      toggle.setAttribute('aria-label', isOpen ? 'Open navigation' : 'Close navigation');
+      nav.classList.toggle('open', !isOpen);
+    });
+  });
+  document.querySelectorAll('.nav-links a').forEach(link=>{
+    link.addEventListener('click', ()=>{
+      const nav = link.closest('.nav-links');
+      nav.classList.remove('open');
+      const toggle = document.querySelector(`[aria-controls="${nav.id}"]`);
+      if(toggle){
+        toggle.setAttribute('aria-expanded', 'false');
+        toggle.setAttribute('aria-label', 'Open navigation');
+      }
+    });
+  });
 
   /* ---- Page: checkout.html ---- */
   const checkoutItems = document.getElementById('checkoutItems');
@@ -358,13 +645,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
     const checkoutEmpty = document.getElementById('checkoutEmpty');
     const orderConfirmation = document.getElementById('orderConfirmation');
     const checkoutForm = document.getElementById('checkoutForm');
-    const discountRate = 0.10;
-    const discountThreshold = 3;
-
     function renderCheckoutSummary(){
       const itemCount = cartItemCount();
       const subtotal = cartTotal();
-      const discount = itemCount >= discountThreshold ? Math.round(subtotal * discountRate) : 0;
+      const discount = itemCount >= BUNDLE_DISCOUNT_THRESHOLD ? Math.round(subtotal * BUNDLE_DISCOUNT_RATE) : 0;
       checkoutLayout.hidden = itemCount === 0;
       checkoutEmpty.hidden = itemCount !== 0;
       checkoutItems.innerHTML = cart.map(item=>`
@@ -378,10 +662,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
       document.getElementById('checkoutDiscount').textContent = discount ? `−${peso(discount)}` : peso(0);
       document.getElementById('checkoutTotal').textContent = peso(subtotal - discount);
       const discountMessage = document.getElementById('discountMessage');
-      discountMessage.textContent = itemCount >= discountThreshold
+      discountMessage.textContent = itemCount >= BUNDLE_DISCOUNT_THRESHOLD
         ? '10% bundle discount applied!'
-        : `Add ${discountThreshold - itemCount} more item${discountThreshold - itemCount === 1 ? '' : 's'} for 10% off.`;
-      discountMessage.classList.toggle('discount-applied', itemCount >= discountThreshold);
+        : `Add ${BUNDLE_DISCOUNT_THRESHOLD - itemCount} more item${BUNDLE_DISCOUNT_THRESHOLD - itemCount === 1 ? '' : 's'} for 10% off.`;
+      discountMessage.classList.toggle('discount-applied', itemCount >= BUNDLE_DISCOUNT_THRESHOLD);
     }
 
     renderCheckoutSummary();
@@ -389,10 +673,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
       event.preventDefault();
       if(!checkoutForm.reportValidity() || cartItemCount() === 0) return;
       const orderId = 'JT-' + Math.floor(10000 + Math.random()*89999);
-      cart.forEach(item=> addToCollection(item, item.qty));
-      cart = [];
-      saveCart();
-      updateCartBadge();
       checkoutLayout.hidden = true;
       orderConfirmation.hidden = false;
       document.getElementById('orderNumber').textContent = orderId;
@@ -435,9 +715,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
       const fallbackProduct = PRODUCTS.find(p=> p.category === c.id && p.image);
       const photo = c.image || (fallbackProduct ? fallbackProduct.image : '');
       const iconInner = photo
-        ? `<img src="${escAttr(photo)}" alt="${escAttr(c.name)}" style="width:100%; height:100%; object-fit:cover; border-radius:inherit;" onerror="imgFallback(this)">`
+        ? `<img src="${escAttr(photo)}" alt="${escAttr(c.name)} collection" onerror="imgFallback(this)">`
         : c.icon;
-      card.innerHTML = `<div class="category-icon" style="background:${c.bg}; overflow:hidden;">${iconInner}</div><h4>${c.name}</h4><span>${c.count}</span>`;
+      card.innerHTML = `<div class="category-photo" style="background:${c.bg};">${iconInner}<span class="category-mark">${c.icon}</span></div><div class="category-card-copy"><h4>${c.name}</h4><span>${c.count} collectibles</span></div>`;
       categoryGrid.appendChild(card);
     });
   }
@@ -468,18 +748,34 @@ document.addEventListener('DOMContentLoaded', ()=>{
         const soldOut = p.tag === 'tag-soldout';
         const card = document.createElement('div');
         card.className = 'product-card';
+        card.tabIndex = 0;
+        card.setAttribute('role', 'group');
+        card.setAttribute('aria-label', `View characters in ${p.name}`);
         card.innerHTML = `
           <div class="product-figure" style="background:var(--surface-2);">
             <div class="tag-row"><span class="tag ${p.tag}">${p.tagText}</span></div>
             ${placeholderBox(p.name, p.image)}
           </div>
+          <div class="product-brand">${p.series}</div>
           <h4>${p.name}</h4>
-          <div class="series">${p.series}${p.chase ? ` · Chase: ${p.chase}` : ''}</div>
+          <div class="product-chase">${p.chase ? `Chase: ${p.chase}` : 'Standard figure · no chase'}</div>
+          <div class="product-view-cue">View characters →</div>
           <div class="product-foot">
             <span class="price">${peso(p.price)}</span>
-            <button class="add-btn" ${soldOut ? 'disabled' : ''} aria-label="Add to cart">+</button>
+            <button class="add-btn" ${soldOut ? 'disabled' : ''} aria-label="Add ${escAttr(p.name)} to cart">${soldOut ? 'Sold out' : 'Add to Cart'}</button>
           </div>`;
-        card.querySelector('.add-btn').addEventListener('click', ()=> addToCart(p));
+        const addButton = card.querySelector('.add-btn');
+        addButton.addEventListener('click', event=>{ event.stopPropagation(); addToCart(p); });
+        card.addEventListener('click', event=>{
+          if(event.target.closest('.add-btn')) return;
+          renderCharacterModal(p);
+        });
+        card.addEventListener('keydown', event=>{
+          if(event.target === card && (event.key === 'Enter' || event.key === ' ')){
+            event.preventDefault();
+            renderCharacterModal(p);
+          }
+        });
         productGrid.appendChild(card);
       });
     }
@@ -696,8 +992,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
       if(owned){
         slot.style.padding = '0';
         slot.style.overflow = 'hidden';
-        slot.innerHTML = placeholderBox(p.name, p.image);
+        slot.innerHTML = `${placeholderBox(p.name, p.image)}<button type="button" class="shelf-size-button" aria-label="Preview actual size of ${escAttr(p.name)}">📏 Size</button>`;
         slot.style.position = 'relative';
+        slot.querySelector('.shelf-size-button').addEventListener('click', event=>{
+          event.stopPropagation();
+          renderScalePreview(p, null);
+        });
         const quantity = document.createElement('span');
         quantity.className = 'shelf-quantity';
         quantity.textContent = `×${item.qty}`;

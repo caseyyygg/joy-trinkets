@@ -7,6 +7,14 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js",
+    "@mkkellogg/gaussian-splats-3d": "https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"
+  }
+}
+</script>
 </head>
 <body>
 
@@ -82,6 +90,7 @@
         </div>
         <div id="checkoutItems"></div>
         <p class="discount-message" id="discountMessage" role="status"></p>
+        <p class="checkout-offer-warning" id="checkoutOfferWarning" role="alert" hidden></p>
         <div class="checkout-totals">
           <div><span>Subtotal</span><span id="checkoutSubtotal"></span></div>
           <div><span>Bundle discount</span><span id="checkoutDiscount"></span></div>
@@ -104,7 +113,7 @@
       <div class="icon-badge">✓</div>
       <span class="kicker">Order preview</span>
       <h2>Order summary ready</h2>
-      <p>Your local order preview <strong id="orderNumber"></strong> is ready. No order has been transmitted or charged, and your cart is still available.</p>
+      <p>Your local order preview <strong id="orderNumber"></strong> is ready. No order has been transmitted or charged. Purchased figures have been added to your collection.</p>
       <a class="btn btn-primary" href="drops.html">Keep browsing</a>
     </section>
   </div>
@@ -127,6 +136,6 @@
 </div>
 <div class="toast" id="toast"></div>
 
-<script src="script.js"></script>
+<script type="module" src="script.js"></script>
 </body>
 </html>

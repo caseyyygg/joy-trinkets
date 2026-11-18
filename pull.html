@@ -7,6 +7,14 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js",
+    "@mkkellogg/gaussian-splats-3d": "https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"
+  }
+}
+</script>
 </head>
 <body>
 
@@ -33,9 +41,9 @@
 <section class="page-section panel-block" style="margin-top:40px;">
   <div class="wrap">
     <div class="pull-head">
-      <span class="kicker">The Joy Trinkets Vault</span>
-      <h2>Pull something you can't find in the catalog</h2>
-      <p style="color:var(--muted); margin-top:12px;">Three free pulls a day from our vault-only figures. Every reveal is a chance to buy, not an automatic purchase. See the exact odds and price before you pull; each offer lasts 30 minutes.</p>
+      <span class="kicker">Digital box pull</span>
+      <h2>Reveal an available in-store figure</h2>
+      <p style="color:var(--muted); margin-top:12px;">Open up to three boxes a day from figures currently available in our catalog. See the exact character, photo, odds, and price before deciding to buy. Each reservation lasts 30 minutes and nothing is charged until checkout.</p>
     </div>
     <div class="pull-auth-prompt" id="pullSignInPrompt" hidden>
       <h3>Sign in to pull a box</h3>
@@ -43,6 +51,12 @@
       <button class="btn btn-primary" data-modal="signin">Sign in</button>
     </div>
     <div class="pull-panel" id="pullPanel">
+      <div class="pull-filter">
+        <label for="pullSeriesFilter">Choose a series</label>
+        <select id="pullSeriesFilter" aria-label="Filter available figures by series">
+          <option value="all">All available series</option>
+        </select>
+      </div>
       <div class="pull-tray" id="pullTray"></div>
       <div>
         <div class="pull-result" id="pullResult">
@@ -52,10 +66,10 @@
       </div>
     </div>
     <div class="vault-odds">
-      <h3>Vault exclusives &amp; exact odds</h3>
-      <p>Each pull selects one of these exclusive figures. Odds are per pull.</p>
+      <h3>Available in-store figures &amp; exact odds</h3>
+      <p>Figures marked sold out are excluded. Odds are recalculated for your selected pool; standard and secret tiers use their listed catalog odds.</p>
       <div class="vault-odds-grid" id="vaultOdds"></div>
-      <p class="vault-demo-note">Demo vault: figures, odds, offer timers, and cart checkout are prototypes; no stock is reserved.</p>
+      <p class="vault-demo-note">A reveal is not a purchase. Add an unexpired pull to your cart to reserve that exact character for checkout.</p>
     </div>
   </div>
 </section>
@@ -95,6 +109,6 @@
 </div>
 <div class="toast" id="toast"></div>
 
-<script src="script.js"></script>
+<script type="module" src="script.js"></script>
 </body>
 </html>

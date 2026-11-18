@@ -1,3 +1,5 @@
+import * as GaussianSplats3D from '@mkkellogg/gaussian-splats-3d';
+
 /* ============================================================
    Joy Trinkets — shared script
    Included by every page. Each page only gets the behavior for
@@ -6,6 +8,71 @@
 
 /* ================= Utilities ================= */
 const peso = n => '₱' + n.toLocaleString('en-PH');
+const DEFAULT_MODEL_URL = './sam3d-splat.ply';
+const MODEL_VIEWER_SETTINGS = {
+  cameraUp:[0, 1, 0],
+  cameraPosition:[0, 0, 1.8],
+  initialCameraLookAt:[0, 0, 0],
+  rotation:[-0.7071, 0, 0, 0.7071],
+};
+const CHARACTER_MODELS = {
+  'amber-husky-with-fish-wand':{url:encodeURI('./Amber Husky with fish wand.ply')},
+  'nicola-splashy-with-crab-hat':{url:encodeURI('./Nicola Splashy with crab hat.ply')},
+  'owen-periwinkle-with-whale-toy':{url:encodeURI('./Owen Periwinkle with whale toy.ply')},
+  'ryan-persian-with-turtle-backpack':{url:encodeURI('./Ryan Persian with turtle backpack.ply')},
+  'sandy-neptune-with-shell-messenger-bag':{url:encodeURI('./Sandy Neptune with shell messenger bag.ply')},
+  'sophie-snow-with-fish-handbag':{url:encodeURI('./Sophie Snow with fish handbag.ply')},
+  'shiny-psyduck':{url:encodeURI('./Shiny Psyduck.ply')},
+  'surprised-psyduck':{url:encodeURI('./Surprised Psyduck.ply')},
+  'headache-psyduck':{url:encodeURI('./Headache Psyduck.ply')},
+  'daydreaming-psyduck':{url:encodeURI('./Daydreaming Psyduck.ply')},
+  'the-ghost':{url:encodeURI('./The Ghost.ply')},
+  'the-fox':{url:encodeURI('./The Fox.ply')},
+  'the-crow':{url:encodeURI('./The Crow.ply')},
+  marionette:{url:encodeURI('./Marionette.ply')},
+  amnesia:{url:encodeURI('./Amnesia.ply')},
+  'camo-cutie':{url:encodeURI('./Camo Cutie.ply')},
+  'denim-cutie':{url:encodeURI('./Denim Cutie.ply')},
+  'neon-cutie':{url:encodeURI('./Neon Cutie.ply')},
+  'pink-cutie':{url:encodeURI('./Pink Cutie.ply')},
+  'vanilla-cutie':{url:encodeURI('./Vanilla Cutie.ply')},
+  'vintage-cutie':{url:encodeURI('./Vintage Cutie.ply')},
+  'baby-ice-pop':{url:encodeURI('./Baby Ice Pop.ply')},
+  'bad-temper':{url:encodeURI('./Bad Temper.ply')},
+  haircut:{url:encodeURI('./Haircut.ply')},
+  'lose-a-tooth':{url:encodeURI('./Lose a Tooth.ply')},
+  'reach-for-the-stars':{url:encodeURI('./Reach for the Stars.ply')},
+  'the-magical-chef':{url:encodeURI('./The Magical Chef.ply')},
+  'wake-up-sleepyhead':{url:encodeURI('./Wake up! Sleepyhead!.ply')},
+  'lotus-pose':{url:encodeURI('./Lotus Pose.ply')},
+  'ship-pose':{url:encodeURI('./Ship Pose.ply')},
+  'shoulders-stand-pose':{url:encodeURI('./Shouldstand Pose.ply')},
+  'shouldstand-pose':{url:encodeURI('./Shouldstand Pose.ply')},
+  'tree-pose':{url:encodeURI('./Tree Pose.ply')},
+  'triangle-pose':{url:encodeURI('./Triangle Pose.ply')},
+  'twist-pose':{url:encodeURI('./Twist Pose.ply')},
+  'smiski-lotus-pose':{url:encodeURI('./Lotus Pose.ply')},
+  'smiski-ship-pose':{url:encodeURI('./Ship Pose.ply')},
+  'smiski-shoulders-stand-pose':{url:encodeURI('./Shouldstand Pose.ply')},
+  'smiski-shouldstand-pose':{url:encodeURI('./Shouldstand Pose.ply')},
+  'smiski-tree-pose':{url:encodeURI('./Tree Pose.ply')},
+  'smiski-triangle-pose':{url:encodeURI('./Triangle Pose.ply')},
+  'smiski-twist-pose':{url:encodeURI('./Twist Pose.ply')},
+};
+
+function characterId(name){
+  return String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+function characterModelData(name, modelUrl='', modelOrientation={}){
+  const id = characterId(name);
+  const {url, ...registryOrientation} = CHARACTER_MODELS[id] || {};
+  return {
+    id,
+    modelUrl:modelUrl || url || '',
+    modelOrientation:{...registryOrientation, ...modelOrientation},
+  };
+}
 
 function toast(msg){
   const t = document.getElementById('toast');
@@ -17,7 +84,7 @@ function toast(msg){
 }
 
 function escAttr(str){
-  return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 function imgFallback(img){
@@ -26,8 +93,12 @@ function imgFallback(img){
   div.innerHTML = '<span class="placeholder-brand">JOY<br>TRINKETS</span><span>Collector photo unavailable</span>';
   img.replaceWith(div);
 }
+window.imgFallback = imgFallback;
 
 function placeholderBox(label, imageUrl){
+  if(imageUrl === '?'){
+    return `<div class="img-placeholder secret-character-placeholder" role="img" aria-label="${escAttr(label)}"><span aria-hidden="true">?</span></div>`;
+  }
   if(imageUrl){
     return `<img class="product-photo" src="${escAttr(imageUrl)}" alt="${escAttr(label)}" onerror="imgFallback(this)">`;
   }
@@ -39,11 +110,11 @@ function placeholderBox(label, imageUrl){
    every category card shows exactly as many series as actually exist in PRODUCTS.
    Series names are real, released lines from each brand (not invented). */
 const CATEGORIES = [
-  {id:'sylvanian', name:'Sylvanian Families', count:'3 sets', icon:'⌂', bg:'#F7E7E8', image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/8711915031349.jpg'},
+  {id:'sylvanian', name:'Sylvanian Families', count:'3 sets', icon:'⌂', bg:'#F7E7E8', image:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTBZ2lMZbS5t-_s5sVBzTGMGPWhab81kQwP17AhYTQ_8gZ38xm_GLPrh0XH&s=10'},
   {id:'hirono', name:'Hirono', count:'3 sets', icon:'◌', bg:'#EEE9F5', image:'https://prod-america-res.popmart.com/default/20231102_173452_687387__1200x1200.jpg'},
   {id:'psyduck', name:'Psyduck', count:'1 set', icon:'◡', bg:'#F8EED7', image:'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/54.png'},
   {id:'crybaby', name:'Crybaby', count:'3 sets', icon:'♡', bg:'#F8E7EA', image:'https://prod-eurasian-res.popmart.com/default/16_oK4KL5lBhg_1200x1200.jpg'},
-  {id:'twinkle', name:'Twinkle Twinkle', count:'3 sets', icon:'✦', bg:'#F5EBDD', image:'https://m.media-amazon.com/images/I/71eEjXaUYfL._AC_SL1500_.jpg'},
+  {id:'twinkle', name:'Twinkle Twinkle', count:'3 sets', icon:'✦', bg:'#F5EBDD', image:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS3BTz6yTZuBBiEHIXvTX2W6Y8GVQJRVyPfA54X71Nas-85EW7nUCFbj0RX&s=10'},
   {id:'smiskis', name:'Smiskis', count:'3 sets', icon:'☼', bg:'#E9EFE8', image:'https://smiski.com/e/wp-content/uploads/2018/08/image.png'},
 ];
 
@@ -61,6 +132,7 @@ function makeCharacters(names, category, series, secretName, characterImages, se
       rarity:character.rarity,
       odds:character.odds,
       image:character.image || '',
+      ...characterModelData(character.name, character.modelUrl, character.modelOrientation),
     }));
   }
   return [
@@ -69,21 +141,23 @@ function makeCharacters(names, category, series, secretName, characterImages, se
       rarity:'Standard',
       odds:'1/12',
       image:characterImage(name, index),
+      ...characterModelData(name),
     })),
-    {name:secretName, rarity:'Secret Chase', odds:'1/144', image:characterImage(secretName, names.length)},
+    {name:secretName, rarity:'Secret Chase', odds:'1/144', image:characterImage(secretName, names.length), ...characterModelData(secretName)},
   ];
 }
 
-function makeSeries({name, category, series, price, tag, tagText, heightCm, image, chase, characters, characterImages}){
+function makeSeries({name, category, series, price, tag, tagText, heightCm, image, chase, characters, characterImages, modelUrl, modelOrientation, modelPreview=true}){
   return {
     name, category, series, price, tag, tagText, heightCm, image, chase,
+    modelUrl:modelUrl || DEFAULT_MODEL_URL, modelOrientation:modelOrientation || null, modelPreview,
     characters:makeCharacters(characters, category, series, chase, characterImages, image),
   };
 }
 
 const PRODUCTS = [
   makeSeries({name:'Baby Seashore Friends Series', category:'sylvanian', series:'Baby Seashore Friends Series', price:420, tag:'tag-new', tagText:'New', heightCm:4.5, image:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSd0E3uBVTVizb6J25exHm4l7JM3qD-D5SHhoNekMgTetZROFUkLhtAVclW&s=10', chase:'Allie Fennec with a crown', characters:['Nicola Splashy with crab hat','Jason Osborne in lobster costume','Owen Periwinkle with whale toy','Sandy Neptune with shell messenger bag','Amber Husky with fish wand','Sophie Snow with fish handbag','Ryan Persian with turtle backpack'], characterImages:['https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2447_1684221335832.jpg','https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2447_1684221290790.jpg','https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2447_1684221327472.jpg','https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2447_1684221314816.jpg','https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2447_1684221303042.jpg','https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2447_1684221320376.jpg','https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2447_1684221308939.jpg','https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2447_1684221342664.jpg']}),
-  makeSeries({name:'Baby Forest Costume Series', category:'sylvanian', series:'Baby Forest Costume Series', price:420, tag:'tag-low', tagText:'Low stock', heightCm:4.5, image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2528_1702876192457.jpg', chase:'Peppermint Marlowe with leaf mask', characters:[
+  makeSeries({name:'Baby Forest Costume Series', modelPreview:false, category:'sylvanian', series:'Baby Forest Costume Series', price:420, tag:'tag-low', tagText:'Low stock', heightCm:4.5, image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2528_1702876192457.jpg', chase:'Peppermint Marlowe with leaf mask', characters:[
     {name:'Perri Buckley in an apple costume', rarity:'Standard', odds:'1/12', image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2528_1702876205185.jpg'},
     {name:'Gilly Golightly in a mushroom costume', rarity:'Standard', odds:'1/12', image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2528_1702876215847.jpg'},
     {name:'Ambrose Walnut in an acorn outfit', rarity:'Standard', odds:'1/12', image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2528_1702876229647.jpg'},
@@ -93,7 +167,7 @@ const PRODUCTS = [
     {name:'Flora Chocolate with a lily of the valley accessory', rarity:'Standard', odds:'1/12', image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2528_1702876290163.jpg'},
     {name:'Peppermint Marlowe with leaf mask', rarity:'Secret Chase', odds:'1/144', image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2528_1702876303098.jpg'},
   ]}),
-  makeSeries({name:'Baby Treats Series', category:'sylvanian', series:'Baby Treats Series', price:420, tag:'tag-new', tagText:'New', heightCm:4.5, image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2276_1639379953292.jpg', chase:'Sandy Neptune with madeleine', characters:[
+  makeSeries({name:'Baby Treats Series', modelPreview:false, category:'sylvanian', series:'Baby Treats Series', price:420, tag:'tag-new', tagText:'New', heightCm:4.5, image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2276_1639379953292.jpg', chase:'Sandy Neptune with madeleine', characters:[
     {name:'Adelaide Outback with koala ice cream', rarity:'Standard', odds:'1/12', image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2276_1639380049780.jpg'},
     {name:'Perri Buckley with deer lollipop', rarity:'Standard', odds:'1/12', image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2276_1639380053868.jpg'},
     {name:'Andy Snow with rabbit waffle', rarity:'Standard', odds:'1/12', image:'https://www.sylvanianfamilies.com/assets/includes_gl/img/products/2276_1639379959183.jpg'},
@@ -118,7 +192,7 @@ const PRODUCTS = [
     {name:'Vagrancy', rarity:'Standard', odds:'1/12', image:'https://hironoworld.com/wp-content/uploads/2025/01/hirono-vagrancy-main-300x300.png.webp'},
     {name:'Dreaming', rarity:'Secret Chase', odds:'1/144', image:'https://hironoworld.com/wp-content/uploads/2025/01/hirono-dreaming-main-300x300.png.webp'},
   ]}),
-  makeSeries({name:'Hirono City of Mercy', category:'hirono', series:'City of Mercy', price:850, tag:'tag-low', tagText:'Low stock', heightCm:8.5, image:'https://www.thetoychronicle.com/wp-content/uploads/2022/12/POP-MART-x-Inner-Flow-Hirono-City-of-Mercy-Blind-Box-Series-758x398.jpg', chase:'Belonging', characters:[
+  makeSeries({name:'Hirono City of Mercy', modelPreview:false, category:'hirono', series:'City of Mercy', price:850, tag:'tag-low', tagText:'Low stock', heightCm:8.5, image:'https://www.thetoychronicle.com/wp-content/uploads/2022/12/POP-MART-x-Inner-Flow-Hirono-City-of-Mercy-Blind-Box-Series-758x398.jpg', chase:'Belonging', characters:[
     {name:'Fallen Angel', rarity:'Standard', odds:'1/12', image:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRc-dmOlXGzPP0Dz7k7HMpEg-bRejCK27n_XmZN2yCjUQ&s=10'},
     {name:'Comfortably Numb', rarity:'Standard', odds:'1/12', image:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR1USMjbhoTq8DNqH3QSJVOY2bG39VtGlCCggQ72hHnYA&s=10'},
     {name:'Healer', rarity:'Standard', odds:'1/12', image:'https://hironoworld.com/wp-content/uploads/2025/01/healer-main-150x150.webp'},
@@ -127,7 +201,7 @@ const PRODUCTS = [
     {name:'Echo', rarity:'Standard', odds:'1/12', image:'https://hironoworld.com/wp-content/uploads/2025/01/echo-main-150x150.webp'},
     {name:'Belonging', rarity:'Secret Chase', odds:'1/144', image:'https://hironoworld.com/wp-content/uploads/2025/01/belonging-main-150x150.webp'},
   ]}),
-  makeSeries({name:'Hirono Reshape', category:'hirono', series:'Reshape', price:900, tag:'tag-new', tagText:'New', heightCm:8.5, image:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRwRDBP6RQOl8cCMgmomvhAxpF2cCmuRSQizgqkHzJ1wA&s=10', chase:'Puppet', characters:[
+  makeSeries({name:'Hirono Reshape', modelPreview:false, category:'hirono', series:'Reshape', price:900, tag:'tag-new', tagText:'New', heightCm:8.5, image:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRwRDBP6RQOl8cCMgmomvhAxpF2cCmuRSQizgqkHzJ1wA&s=10', chase:'Puppet', characters:[
     {name:'Healing', rarity:'Standard', odds:'1/12', image:'https://prod-global-biz.popmart.com/globalAdmin/1785916086463_c81e728d9d4c2f636f067f89cc14862c.jpg?x-oss-process=image/resize,w_1600/quality,q_90/format,avif'},
     {name:'Paradise Lost', rarity:'Standard', odds:'1/12', image:'https://prod-global-biz.popmart.com/globalAdmin/1789099092186_c4ca4238a0b923820dcc509a6f75849b.jpg?x-oss-process=image/resize,w_1600/quality,q_90/format,avif'},
     {name:'Drowning', rarity:'Standard', odds:'1/12', image:'https://prod-global-biz.popmart.com/globalAdmin/1789099065193_c9f0f895fb98ab9159f51fd0297e236d.jpg?x-oss-process=image/resize,w_1600/quality,q_90/format,avif'},
@@ -147,54 +221,213 @@ const PRODUCTS = [
     {name:'Shiny Psyduck', rarity:'Secret Chase', odds:'1/144', image:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTzIIRz59pt70sf9XoxEyeej5RsIDUvYoYoGhGXHD1u6LW14Rn0JZik0ZP-&s=10'},
   ]}),
 
-  // TODO: Replace generated character image paths with individual photos for each series.
-  makeSeries({name:'Crybaby Crying Again', category:'crybaby', series:'Crying Again', price:820, tag:'tag-new', tagText:'New', heightCm:9, image:'https://down-ph.img.susercontent.com/file/cn-11134207-7ras8-m0leadz4njrbdc', chase:'Crying Again Secret', characters:['Crying Again - Blue','Crying Again - Pink','Crying Again - Yellow','Crying Again - Green','Crying Again - Purple','Crying Again - White']}),
-  makeSeries({name:'Crybaby Wild but Cutie', category:'crybaby', series:'Wild but Cutie', price:750, tag:'tag-low', tagText:'Low stock', heightCm:9, image:'https://down-my.img.susercontent.com/file/cn-11134207-7ras8-m9qqk7v3nonm07', chase:'Wild Cutie', characters:['Bunny','Bear','Fox','Tiger','Deer','Lamb']}),
-  makeSeries({name:'Crybaby Monster Tears', category:'crybaby', series:'Monster Tears', price:780, tag:'tag-soldout', tagText:'Sold out', heightCm:9, image:'https://down-my.img.susercontent.com/file/cn-11134207-7r98o-lz627es7pcpudf', chase:'Moth Queen', characters:['Monster Tears - Blue','Monster Tears - Pink','Monster Tears - Yellow','Monster Tears - Green','Monster Tears - Purple','Monster Tears - White']}),
+  makeSeries({name:'Crybaby Crying Again', modelPreview:false, category:'crybaby', series:'Crying Again', price:820, tag:'tag-new', tagText:'New', heightCm:9, image:'https://down-ph.img.susercontent.com/file/cn-11134207-820l4-mk82p23mcged05', chase:'Crying Again - Secret', characters:[
+    {name:'Crying Again - Blue', rarity:'Standard', odds:'1/12', image:'https://global-static.popmart.com/globalAdmin/1736409968827____she-s-alice____.png?x-oss-process=image/format,webp'},
+    {name:'Crying Again - Pink', rarity:'Standard', odds:'1/12', image:'https://global-static.popmart.com/globalAdmin/1736409938007____i-ll-give-you-all-my-love____.png?x-oss-process=image/format,webp'},
+    {name:'Crying Again - Yellow', rarity:'Standard', odds:'1/12', image:'https://global-static.popmart.com/globalAdmin/1736409950023____duck-you____.png?x-oss-process=image/format,webp'},
+    {name:'Crying Again - Green', rarity:'Standard', odds:'1/12', image:'https://global-static.popmart.com/globalAdmin/1736409962650____what-a-frog____.png?x-oss-process=image/format,webp'},
+    {name:'Crying Again - Brown', rarity:'Standard', odds:'1/12', image:'https://global-static.popmart.com/globalAdmin/1736409956466____i-ll-bring-you-a-flower____.png?x-oss-process=image/format,webp'},
+    {name:'Crying Again - Secret', rarity:'Secret Chase', odds:'1/144', image:'https://global-static.popmart.com/globalAdmin/1736409988578____secret____.png?x-oss-process=image/format,webp'},
+    {name:'Crying Again - Super Secret', rarity:'Secret Chase', odds:'1/144', image:'https://global-static.popmart.com/globalAdmin/1736409981889____super-secret____.png?x-oss-process=image/format,webp'},
+  ]}),
+  makeSeries({name:'Crybaby Wild but Cutie', category:'crybaby', series:'Wild but Cutie', price:750, tag:'tag-low', tagText:'Low stock', heightCm:9, image:'https://prod-apac-r2.popmart.com/cdn-cgi/image/width=3840%2Cformat=webp/https://prod-eurasian-res.popmart.com/default/20250512_155750_390280____6_____1200x1200.jpg', chase:'Vintage Cutie', characters:[
+    {name:'Pink Cutie', rarity:'Standard', odds:'1/12', image:'https://prod-eurasian-res.popmart.com/default/20250512_155750_870769____1_____1200x1200.jpg'},
+    {name:'Vanilla Cutie', rarity:'Standard', odds:'1/12', image:'https://pushas.com/cdn/shop/files/POP-MART-CRYBABY-Wild-but-Cutie-Series-Vinyl-Plush-Pendant-_6-Blind-Boxes_-vanilla-cutie.jpeg?v=1751507140&width=1200'},
+    {name:'Neon Cutie', rarity:'Standard', odds:'1/12', image:'https://global-static.popmart.com/globalAdmin/1747019143423____neon-cutie____.png?x-oss-process=image/format,webp'},
+    {name:'Denim Cutie', rarity:'Standard', odds:'1/12', image:'https://global-static.popmart.com/globalAdmin/1747019125295____denim-cutie____.png?x-oss-process=image/format,webp'},
+    {name:'Camo Cutie', rarity:'Standard', odds:'1/12', image:'https://global-static.popmart.com/globalAdmin/1747019118058____camo-cutie____.png?x-oss-process=image/format,webp'},
+    {name:'Vintage Cutie', rarity:'Standard', odds:'1/12', image:'https://global-static.popmart.com/globalAdmin/1747019108985____vintage-cutie____.png?x-oss-process=image/format,webp'},
+  ]}),
+  makeSeries({name:'Crybaby Monster Tears', modelPreview:false, category:'crybaby', series:'Monster Tears', price:780, tag:'tag-soldout', tagText:'Sold out', heightCm:9, image:'https://www.picclickimg.com/TgsAAOSwIGBkZGbx/POP-MART-Crybaby-Monster-Tears-Series-Blind-Box.webp', chase:'Secret', characters:[
+    {name:'Sweet Werewolf', rarity:'Standard', odds:'1/12', image:'https://prod-america-res.popmart.com/default/11_hegolgQlsS_1200x1200.jpg?x-oss-process=image/resize,w_1600/quality,q_90/format,avif'},
+    {name:'Sea Monsterf', rarity:'Standard', odds:'1/12', image:'https://prod-america-res.popmart.com/default/01_chswdu74K0_1200x1200.jpg?x-oss-process=image/resize,w_1600/quality,q_90/format,avif'},
+    {name:'Big Boy Frankief', rarity:'Standard', odds:'1/12', image:'https://prod-america-res.popmart.com/default/08_b2AYbaYTqY_1200x1200.jpg?x-oss-process=image/resize,w_1600/quality,q_90/format,avif'},
+    {name:'Burn Baby Burn', rarity:'Standard', odds:'1/12', image:'https://prod-america-res.popmart.com/default/10_5APkzu7bnf_1200x1200.jpg?x-oss-process=image/resize,w_1600/quality,q_90/format,avif'},
+    {name:'Happie', rarity:'Standard', odds:'1/12', image:'https://prod-america-res.popmart.com/default/02_tzUAG36qD7_1200x1200.jpg?x-oss-process=image/resize,w_1600/quality,q_90/format,avif'},
+    {name:'Soul Eater', rarity:'Standard', odds:'1/12', image:'https://prod-america-res.popmart.com/default/03_4HlEEt0FGa_1200x1200.jpg?x-oss-process=image/resize,w_1600/quality,q_90/format,avif'},
+    {name:'Frosty Candy', rarity:'Standard', odds:'1/12', image:'https://prod-america-res.popmart.com/default/04_BFnp7m5WeF_1200x1200.jpg?x-oss-process=image/resize,w_1600/quality,q_90/format,avif'},
+    {name:'Lady Mummy', rarity:'Standard', odds:'1/12', image:'https://prod-america-res.popmart.com/default/05_eJa9q2Zhvq_1200x1200.jpg?x-oss-process=image/resize,w_1600/quality,q_90/format,avif'},
+    {name:'Spooky Kitty', rarity:'Standard', odds:'1/12', image:'https://prod-america-res.popmart.com/default/06_X7LyGJooiz_1200x1200.jpg?x-oss-process=image/resize,w_1600/quality,q_90/format,avif'},
+    {name:'Mr. Invinsible', rarity:'Standard', odds:'1/12', image:'https://prod-america-res.popmart.com/default/07_kPqZMOJWZl_1200x1200.jpg?x-oss-process=image/resize,w_1600/quality,q_90/format,avif'},
+    {name:'The Lonely Bones', rarity:'Standard', odds:'1/12', image:'https://prod-america-res.popmart.com/default/09_H6eGCWKONd_1200x1200.jpg?x-oss-process=image/resize,w_1600/quality,q_90/format,avif'},
+    {name:'Witch Wish', rarity:'Standard', odds:'1/12', image:'https://prod-america-res.popmart.com/default/12_22Spocncuz_1200x1200.jpg?x-oss-process=image/resize,w_1600/quality,q_90/format,avif'},
+    {name:'Secret', rarity:'Secret Chase', odds:'1/144', image:'https://prod-america-res.popmart.com/default/secret_ZwgJrxSKt3_1200x1200.jpg?x-oss-process=image/resize,w_1600/quality,q_90/format,avif'},
+    {name:'Super Secret', rarity:'Secret Chase', odds:'1/144', image:'https://prod-america-res.popmart.com/default/super_secret_t2lzMH7wk7_1200x1200.jpg?x-oss-process=image/resize,w_1600/quality,q_90/format,avif'},
+  ]}),
 
   // TODO: Replace generated character image paths with individual photos for each series.
-  makeSeries({name:'Twinkle Twinkle Savor the Moment', category:'twinkle', series:'Savor the Moment', price:830, tag:'tag-new', tagText:'New', heightCm:8, image:'https://m.media-amazon.com/images/I/71eEjXaUYfL._AC_SL1500_.jpg', chase:'Matcha Cream Snow', characters:['Sweet Morning','Little Picnic','Quiet Afternoon','Warm Embrace','Evening Wish','Sunday Stroll']}),
-  makeSeries({name:'Twinkle Twinkle A Big Hug for You', category:'twinkle', series:'A Big Hug for You', price:810, tag:'tag-low', tagText:'Low stock', heightCm:8, image:'https://i.ebayimg.com/images/g/f7oAAeSw9MtorHa5/s-l1600.webp', chase:'The Best Gift', characters:['A Big Hug','Tiny Gift','Warm Wishes','Sweet Dreams','Little Star','Long Embrace']}),
-  makeSeries({name:'Twinkle Twinkle Be a Little Star', category:'twinkle', series:'Be a Little Star', price:900, tag:'tag-new', tagText:'New', heightCm:8, image:'https://down-ph.img.susercontent.com/file/cn-11134207-7ras8-m8gal17u0h7h95', chase:'Reach for the Stars', characters:['Starry Night','Moonbeam','Wish Maker','Cloud Nine','Shining Bright','Starlight']}),
+  makeSeries({name:'Twinkle Twinkle Savor the Moment', modelPreview:false, category:'twinkle', series:'Savor the Moment', price:830, tag:'tag-new', tagText:'New', heightCm:8, image:'https://prod-apac-r2.popmart.com/cdn-cgi/image/width=3840%2Cformat=webp/https://prod-eurasian-res.popmart.com/default/20250923_161016_447485____7_____1200x1200.jpg', chase:'Matcha Cream Snow', characters:[
+    {name:'Lazy Moments', rarity:'Standard', odds:'1/12', image:'https://toysez.com/cdn/shop/files/1_3_73a15dda-577b-4b98-91d6-43973db6bd49.jpg?v=1759164814'},
+    {name:'Eternity of Pizza', rarity:'Standard', odds:'1/12', image:'https://toysez.com/cdn/shop/files/2_3_3c5d4aa5-dd43-4638-878e-3f3c4675d626.jpg?v=1759164814'},
+    {name:'Macaron Moment', rarity:'Standard', odds:'1/12', image:'https://prod-apac-r2.popmart.com/cdn-cgi/image/width=640%2Cformat=webp/https://prod-eurasian-res.popmart.com/default/20250923_161016_352851____3_____1200x1200.jpg'},
+    {name:'Earl Teapot', rarity:'Standard', odds:'1/12', image:'https://toysez.com/cdn/shop/files/5_3_4b6d15d9-1e0f-4680-84df-e60073755cd3.jpg?v=1759164814'},
+    {name:'Orange Marmalade', rarity:'Standard', odds:'1/12', image:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQICVqByqlAekRGbqhhA71Zzpb40oEFVz9nN4WMn3gRnA&s=105'},
+    {name:'Lucky Pudding', rarity:'Standard', odds:'1/12', image:'https://prod-apac-r2.popmart.com/cdn-cgi/image/width=640%2Cformat=webp/https://prod-eurasian-res.popmart.com/default/20250923_161016_050042____4_____1200x1200.jpg'},
+    {name:'Strong Bread', rarity:'Standard', odds:'1/12', image:'https://toysez.com/cdn/shop/files/7_4_1c6ed068-3f45-4351-bdb9-97d10b3fbe9f_large.jpg?v=1759164814'},
+    {name:'Cookie House', rarity:'Standard', odds:'1/12', image:'https://prod-apac-r2.popmart.com/cdn-cgi/image/width=640%2Cformat=webp/https://prod-eurasian-res.popmart.com/default/20250923_161016_370171____6_____1200x1200.jpg'},
+    {name:'Star Candy', rarity:'Standard', odds:'1/12', image:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSqY8PAqXRUIClGBmSJf9CJIASxTR-fP4NZkiHDh50FXYQy1vtcQ_XgSYw&s=10'},
+    {name:'Coffee Milk Bath', rarity:'Standard', odds:'1/12', image:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS10nPKoBcfqrrmmRWhYUjnzZWEAp4sig2oKDOIX1ypPwaaqQQMzIAgutq3&s=10'},
+    {name:'Happy Palmier', rarity:'Standard', odds:'1/12', image:'https://prod-apac-r2.popmart.com/cdn-cgi/image/width=640%2Cformat=webp/https://prod-eurasian-res.popmart.com/default/20250923_161016_842890____2_____1200x1200.jpg'},
+    {name:'Chesnut Cream', rarity:'Standard', odds:'1/12', image:'https://prod-apac-r2.popmart.com/cdn-cgi/image/width=640%2Cformat=webp/https://prod-eurasian-res.popmart.com/default/20250923_161016_615153____5_____1200x1200.jpg'},
+    {name:'Matcha Cream Snow', rarity:'Secret Chase', odds:'1/144', image:'https://prod-apac-r2.popmart.com/cdn-cgi/image/width=640%2Cformat=webp/https://prod-eurasian-res.popmart.com/default/20250923_161016_277770____8_____1200x1200.jpg'},
+  ]}),
+  makeSeries({name:'Twinkle Twinkle A Big Hug for You', modelPreview:false, category:'twinkle', series:'A Big Hug for You', price:810, tag:'tag-low', tagText:'Low stock', heightCm:8, image:'https://i.pinimg.com/736x/bc/5e/1b/bc5e1b17c38a3e3250bf169822774c87.jpg', chase:'The Best Gift', characters:[
+    {name:'Make a Wish', rarity:'Standard', odds:'1/12', image:'https://global-static.popmart.com/globalAdmin/1733457544228____make-a-wish____.png?x-oss-process=image/format,webp'},
+    {name:'Star Apple', rarity:'Standard', odds:'1/12', image:'https://global-static.popmart.com/globalAdmin/1733457550314____star-apple____.png?x-oss-process=image/format,webp'},
+    {name:'Star Jar', rarity:'Standard', odds:'1/12', image:'https://global-static.popmart.com/globalAdmin/1733457556439____star-jar____.png?x-oss-process=image/format,webp'},
+    {name:'Happy Trumpeter', rarity:'Standard', odds:'1/12', image:'https://global-static.popmart.com/globalAdmin/1733457563172____happy-trumpeter____.png?x-oss-process=image/format,webp'},
+    {name:'Lovely Puppy', rarity:'Standard', odds:'1/12', image:'https://global-static.popmart.com/globalAdmin/1733457583784____lovely-puppy____.png?x-oss-process=image/format,webp'},
+    {name:'A Big Hug', rarity:'Standard', odds:'1/12', image:'https://global-static.popmart.com/globalAdmin/1733457589240____a-big-hug____.png?x-oss-process=image/format,webp'},
+    {name:'Fortune Cookies', rarity:'Standard', odds:'1/12', image:'https://global-static.popmart.com/globalAdmin/1733457595203____fortune-cookies____.png?x-oss-process=image/format,webp'},
+    {name:'Snowman Friend', rarity:'Standard', odds:'1/12', image:'https://global-static.popmart.com/globalAdmin/1733457602109____snowman-friend____.png?x-oss-process=image/format,webp'},
+    {name:'Handwritten Gift', rarity:'Standard', odds:'1/12', image:'https://global-static.popmart.com/globalAdmin/1733457608559____handwritten-gift____.png?x-oss-process=image/format,webp'},
+    {name:'The Best Gift', rarity:'Secret Chase', odds:'1/144', image:'https://global-static.popmart.com/globalAdmin/1733457615147____secret____.png?x-oss-process=image/format,webp'},
+  ]}),
+  makeSeries({name:'Twinkle Twinkle Be a Little Star', category:'twinkle', series:'Be a Little Star', price:900, tag:'tag-new', tagText:'New', heightCm:8, image:'https://prod-apac-r2.popmart.com/cdn-cgi/image/width=1080%2Cformat=webp/https://prod-eurasian-res.popmart.com/default/20250416_173926_717731____5_____1200x1200.jpg', chase:'Reach for the Stars', characters:[
+    {name:'Lose a Tooth', rarity:'Standard', odds:'1/12', image:'https://images.stockx.com/images/Pop-Mart-Twinkle-Twinkle-Be-a-Little-Star-Series-Lose-a-Tooth-Figure.jpg?fit=fill&bg=FFFFFF&w=700&h=500&fm=webp&auto=compress&q=90&dpr=2&trim=color&updated_at=1750192763'},
+    {name:'Wake up! Sleepyhead!', rarity:'Standard', odds:'1/12', image:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ6yV1XQ2B3txwGYeuomy1U0glqH5ABKJRL3PasgIRNmg&s=10'},
+    {name:'Haircut', rarity:'Standard', odds:'1/12', image:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRGOMqFdoCata8sTAk2w8GGSkaGIgzaEARgkxyvyruSjjx8vskAw1RdyR8&s=10'},
+    {name:'Bad Temper', rarity:'Standard', odds:'1/12', image:'https://images.stockx.com/images/Pop-Mart-Twinkle-Twinkle-Be-a-Little-Star-Series-Bad-Temper-Figure.jpg?fit=fill&bg=FFFFFF&w=700&h=500&fm=webp&auto=compress&q=90&dpr=2&trim=color&updated_at=1750192773'},
+    {name:'The Magical Chef', rarity:'Standard', odds:'1/12', image:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRTFoN4IV1hdgWFSSdC1RMP8aSpfQbnbtzQjB3J3ZIhfj5G0trELECFZ8uG&s=10'},
+    {name:'Baby Ice Pop', rarity:'Standard', odds:'1/12', image:'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSDguvgcR_uhbf4wW8z5sH-pOMqprfSYgEXweMb_yU1Rvj9a0cE5Is0s0c&s=10'},
+    {name:'Reach for the Stars', rarity:'Secret Chase', odds:'1/144', image:'https://media.karousell.com/media/photos/products/2025/4/19/secret_rare_popmart_popmart_tw_1745036319_caeb76b8_progressive.jpg'},
+  ]}),
 
-  // Smiski — official blind-box series; each has six designs and a rare secret.
-  // TODO: Add individual Secret Smiski image URLs to each Smiski characterImages list.
-  makeSeries({name:'Smiski Living Series', category:'smiskis', series:'Living Series', price:590, tag:'tag-new', tagText:'New', heightCm:6.5, image:'https://smiski.com/e/wp-content/uploads/2018/08/05.png', chase:'Secret Smiski', characters:['Daydreaming','Playing','Hiding','Nap Time','Thinking','Lifting'], characterImages:['https://smiski.com/e/wp-content/uploads/2018/08/05.png','https://smiski.com/e/wp-content/uploads/2018/08/04.png','https://smiski.com/e/wp-content/uploads/2018/08/02.png','https://smiski.com/e/wp-content/uploads/2018/08/03.png','https://smiski.com/e/wp-content/uploads/2018/08/01.png','https://smiski.com/e/wp-content/uploads/2018/08/06.png']}),
-  makeSeries({name:'Smiski Bed Series', category:'smiskis', series:'Bed Series', price:590, tag:'tag-low', tagText:'Low stock', heightCm:6.5, image:'https://smiski.com/e/wp-content/uploads/2019/07/img_bed_products_01.png', chase:'Secret Smiski', characters:['Before Rest','Sleepy','Co-sleeping','Reading','At Sleep','Fussing'], characterImages:['https://smiski.com/e/wp-content/uploads/2019/07/img_bed_products_01.png','https://smiski.com/e/wp-content/uploads/2019/07/img_bed_products_02.png','https://smiski.com/e/wp-content/uploads/2019/07/img_bed_products_03.png','https://smiski.com/e/wp-content/uploads/2019/07/img_bed_products_04.png','https://smiski.com/e/wp-content/uploads/2019/07/img_bed_products_05.png','https://smiski.com/e/wp-content/uploads/2019/07/img_bed_products_06.png']}),
-  makeSeries({name:'Smiski Yoga Series', category:'smiskis', series:'Yoga Series', price:590, tag:'tag-new', tagText:'New', heightCm:6.5, image:'https://smiski.com/e/wp-content/uploads/2019/09/img_yoga_01.png', chase:'Secret Smiski', characters:['Lotus Pose','Twist Pose','Shouldstand Pose','Triangle Pose','Tree Pose','Ship Pose'], characterImages:['https://smiski.com/e/wp-content/uploads/2019/09/img_yoga_01.png','https://smiski.com/e/wp-content/uploads/2019/09/img_yoga_02.png','https://smiski.com/e/wp-content/uploads/2019/09/img_yoga_03.png','https://smiski.com/e/wp-content/uploads/2019/09/img_yoga_04.png','https://smiski.com/e/wp-content/uploads/2019/09/img_yoga_05.png','https://smiski.com/e/wp-content/uploads/2019/09/img_yoga_06.png']}),
+  // Smiski series use six standard designs and one secret question-mark slot.
+  makeSeries({name:'Smiski Living Series', modelPreview:false, category:'smiskis', series:'Living Series', price:590, tag:'tag-new', tagText:'New', heightCm:6.5, image:'https://smiski.com/e/wp-content/uploads/2018/08/05.png', chase:'Secret', characters:['Daydreaming','Playing','Hiding','Nap Time','Thinking','Lifting'], characterImages:[
+    'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ-MHAyZhcOO2a5RJq-Jvmz7KwC1K1JNr0QQ63CqN4vZo-XakQUtbQIxBYw&s=10',
+    'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTgFIlrViJcShzgOicbpXsS8DeH1QdwNZq_1OU5O_sOWymUguZXe2R5Dxc7&s=10',
+    'https://blinkbox.com.au/cdn/shop/files/smiski_living-series_hiding-holding.webp?v=1706086015&width=1406',
+    'https://mindzai.com/cdn/shop/files/652eb54139e4ab4dc3c1b6b7_1739601159556_be7ba372-18d0-436b-bc06-3668c1ad316e_5000x.jpg?v=1776017829',
+    'https://i.ebayimg.com/images/g/VHcAAOSwXoJoWFUY/s-l1200.jpg',
+    'https://blinkbox.com.au/cdn/shop/files/smiski_living-series_individual-lifting.webp?crop=center&height=1500&v=1706086015&width=1500',
+    '?',
+  ]}),
+  makeSeries({name:'Smiski Bed Series', modelPreview:false, category:'smiskis', series:'Bed Series', price:590, tag:'tag-low', tagText:'Low stock', heightCm:6.5, image:'https://smiski.com/e/wp-content/uploads/2019/07/img_bed_products_01.png', chase:'Secret (Crescent Moon)', characters:['Before Rest','Sleepy','Co-Sleeping','Reading','At Sleep','Fussing'], characterImages:[
+    'https://smiski.com/e/wp-content/uploads/2019/07/img_bed_products_04.png',
+    'https://smiski.com/e/wp-content/uploads/2019/07/img_bed_products_02.png',
+    'https://smiski.com/e/wp-content/uploads/2019/07/img_bed_products_03.png',
+    'https://smiski.com/e/wp-content/uploads/2019/07/img_bed_products_04.png',
+    'https://smiski.com/e/wp-content/uploads/2019/07/img_bed_products_05.png',
+    'https://smiski.com/e/wp-content/uploads/2019/07/img_bed_products_06.png',
+    '?',
+  ]}),
+  makeSeries({name:'Smiski Yoga Series', category:'smiskis', series:'Yoga Series', price:590, tag:'tag-new', tagText:'New', heightCm:6.5, image:'https://smiski.com/e/wp-content/uploads/2019/09/img_yoga_01.png', chase:'Secret (Twin Angels)', characters:['Lotus Pose','Twist Pose','Ship Pose','Triangle Pose','Shoulders Stand Pose','Tree Pose'], characterImages:[
+    'https://smiski.com/e/wp-content/uploads/2019/09/img_yoga_01.png?v=2',
+    'https://smiski.com/e/wp-content/uploads/2019/09/img_yoga_02.png',
+    'https://smiski.com/e/wp-content/uploads/2019/09/img_yoga_06.png',
+    'https://smiski.com/e/wp-content/uploads/2019/09/img_yoga_04.png',
+    'https://smiski.com/e/wp-content/uploads/2019/09/img_yoga_03.png',
+    'https://smiski.com/e/wp-content/uploads/2019/09/img_yoga_05.png',
+    '?',
+  ]}),
 ];
 
-const PULL_POOL_VERSION = 2;
+const PULL_POOL_VERSION = 3;
 const PULL_OFFER_DURATION = 30 * 60 * 1000;
-const PULL_EXCLUSIVES = [
-  {name:'Moonpetal Keeper', series:'Joy Trinkets Vault', price:980, rarityLabel:'Vault Exclusive', rarityClass:'rarity-common', odds:55, heightCm:7},
-  {name:'Starlight Parade', series:'Joy Trinkets Vault', price:1280, rarityLabel:'Rare Exclusive', rarityClass:'rarity-rare', odds:30, heightCm:7},
-  {name:'Dreamweaver Guardian', series:'Joy Trinkets Vault', price:1680, rarityLabel:'Ultra-Rare Exclusive', rarityClass:'rarity-ultra', odds:12, heightCm:7},
-  {name:'Golden Wish Keeper', series:'Joy Trinkets Vault', price:2280, rarityLabel:'Secret Chase', rarityClass:'rarity-secret', odds:3, heightCm:7},
-];
-const COLLECTIBLE_PRODUCTS = [...PRODUCTS, ...PULL_EXCLUSIVES];
+const AVAILABLE_PULL_POOL = PRODUCTS
+  .filter(product=> product.tag !== 'tag-soldout')
+  .flatMap(product=> product.characters.map(character=>{
+    const denominator = Number(String(character.odds).match(/\/\s*(\d+)/)?.[1]) || 12;
+    return {
+      id:`${product.name}:${character.id}`,
+      characterId:character.id,
+      name:character.name,
+      productName:product.name,
+      seriesName:product.series,
+      price:product.price,
+      image:character.image || product.image || '',
+      rarity:character.rarity,
+      odds:character.odds,
+      rarityClass:character.rarity === 'Secret Chase' ? 'rarity-secret' : 'rarity-common',
+      weight:1 / denominator,
+      product,
+      character,
+    };
+  }));
+const COLLECTIBLE_PRODUCTS = PRODUCTS;
 
-const BASE_LISTINGS = [
-  {name:'Baby Seashore Friends Series', desc:'→ open to offers for another Sylvanian baby series', by:'@roro.crates', time:'2h ago', bg:'#FFE1E8'},
-  {name:'Hirono The Other One', desc:'x2 dupes → open to offers', by:'@finchbox', time:'5h ago', bg:'#FFF3D6'},
-  {name:'Crybaby Crying Again', desc:'→ open to offers for another Crybaby series', by:'@minttape', time:'1d ago', bg:'#E1F9F1'},
+const MARKETPLACE_CHARACTERS = PRODUCTS.flatMap(product=>product.characters.map(character=>({
+    key:`${product.name}::${character.id}`,
+    product,
+    character,
+  })));
+const MARKETPLACE_BY_KEY = new Map(MARKETPLACE_CHARACTERS.map(entry=>[entry.key, entry]));
+const COMMUNITY_CANDIDATES = MARKETPLACE_CHARACTERS.filter(entry=>entry.product.tag !== 'tag-soldout');
+const COMMUNITY_SELLERS = [
+  {handle:'@roro.crates', deals:12},
+  {handle:'@finchbox', deals:8},
+  {handle:'@minttape', deals:21},
+  {handle:'@shelfshelf', deals:6},
+  {handle:'@pinkboxpe', deals:15},
+  {handle:'@collectph', deals:9},
 ];
-const EXTRA_LISTINGS = [
-  {name:'Smiski Yoga Series', desc:'→ looking for another Smiski series', by:'@shelfshelf', time:'1d ago', bg:'#FFE9DC'},
-  {name:'Twinkle Twinkle Be a Little Star', desc:'Chase pulled → offers only', by:'@pinkboxpe', time:'2d ago', bg:'#EFE7FF'},
-  {name:'Psyduck Figure Collection', desc:'x3 dupes → will bundle', by:'@collectph', time:'3d ago', bg:'#E3F0FF'},
-];
+const COMMUNITY_LISTINGS = COMMUNITY_CANDIDATES.slice(0, COMMUNITY_SELLERS.length).map((entry, index)=>{
+  const iso = MARKETPLACE_CHARACTERS[(index + COMMUNITY_SELLERS.length) % MARKETPLACE_CHARACTERS.length];
+  return {
+    id:`community-${index + 1}`,
+    productName:entry.product.name,
+    characterId:entry.character.id,
+    type:['trade', 'sale', 'trade-or-buy'][index % 3],
+    askPrice:entry.product.price,
+    conditions:index % 2 ? ['Opened', 'With Box', 'With Card'] : ['Sealed Foil', 'With Box', 'With Card'],
+    seller:COMMUNITY_SELLERS[index].handle,
+    verifiedDeals:COMMUNITY_SELLERS[index].deals,
+    isoIds:[iso.key],
+    openToOffers:index % 2 === 0,
+    community:true,
+  };
+});
 
 /* ================= Cart (persisted across pages) ================= */
 function loadCart(){
+  let stored;
   try{
-    return JSON.parse(localStorage.getItem('joytrinkets_cart')) || [];
-  }catch(e){ return []; }
+    const raw = localStorage.getItem('joytrinkets_cart');
+    stored = raw ? JSON.parse(raw) : [];
+  }catch(error){
+    console.error('Could not read the cart.', error);
+    toast('Your saved cart could not be read');
+    return [];
+  }
+  if(!Array.isArray(stored)){
+    console.error('The saved cart is not a valid list.');
+    return [];
+  }
+  let updated = false;
+  const loaded = stored.filter(line=>{
+    const valid = line.isBoxPull || PRODUCTS.some(product=>product.name === (line.productName || line.name));
+    if(!valid) updated = true;
+    return valid;
+  }).map(line=>{
+    if(line.id) return line;
+    updated = true;
+    return {...line, id:createLocalId('cart')};
+  });
+  if(updated){
+    try{
+      localStorage.setItem('joytrinkets_cart', JSON.stringify(loaded));
+    }catch(error){
+      console.error('Could not migrate the saved cart.', error);
+      toast('Your saved cart could not be updated');
+    }
+  }
+  return loaded;
 }
 function saveCart(){
-  try{ localStorage.setItem('joytrinkets_cart', JSON.stringify(cart)); }catch(e){ /* ignore */ }
+  try{
+    localStorage.setItem('joytrinkets_cart', JSON.stringify(cart));
+    return true;
+  }catch(error){
+    console.error('Could not save the cart.', error);
+    toast('Your cart could not be saved in this browser');
+    return false;
+  }
 }
 let cart = loadCart();
+function createLocalId(prefix){
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
 const BUNDLE_DISCOUNT_THRESHOLD = 3;
 const BUNDLE_DISCOUNT_RATE = 0.10;
 
@@ -218,26 +451,101 @@ function updateSignInButton(){
 
 function loadCollection(){
   try{
-    const collection = JSON.parse(localStorage.getItem('joytrinkets_collection')) || [];
+    const raw = localStorage.getItem('joytrinkets_collection');
+    const collection = raw ? JSON.parse(raw) : [];
+    if(raw && !Array.isArray(collection)) console.error('The saved collection is not a valid list.');
     return Array.isArray(collection) ? collection : [];
-  }catch(e){ return []; }
+  }catch(error){
+    console.error('Could not read the collection.', error);
+    toast('Your saved collection could not be read');
+    return [];
+  }
 }
 function saveCollection(collection){
-  try{ localStorage.setItem('joytrinkets_collection', JSON.stringify(collection)); }catch(e){ /* ignore */ }
-}
-function addToCollection(item, quantity=1){
-  const collection = loadCollection();
-  const owned = collection.find(entry=> entry.name === item.name);
-  if(owned) owned.qty += quantity;
-  else collection.push({name:item.name, qty:quantity});
-  saveCollection(collection);
+  try{
+    localStorage.setItem('joytrinkets_collection', JSON.stringify(collection));
+    return true;
+  }catch(error){
+    console.error('Could not save the collection.', error);
+    toast('Your collection could not be saved in this browser');
+    return false;
+  }
 }
 function addToCart(p){
-  const line = cart.find(l=> l.name === p.name);
-  if(line) line.qty++; else cart.push({name:p.name, price:p.price, qty:1, image:p.image || ''});
-  saveCart();
+  const line = cart.find(l=> !l.isBoxPull && (l.productName || l.name) === p.name);
+  if(line) line.qty++;
+  else cart.push({id:createLocalId('product'), name:p.name, productName:p.name, seriesName:p.series, price:p.price, qty:1, image:p.image || ''});
+  if(!saveCart()) return;
   updateCartBadge();
   toast(`${p.name} added to cart`);
+}
+function addPulledFigureToCart(poolItem, pullId, offerExpiresAt){
+  if(!Number.isFinite(Number(offerExpiresAt)) || offerExpiresAt <= Date.now()) return false;
+  const reservationId = `pull-${pullId}`;
+  if(cart.some(line=>line.id === reservationId)) return true;
+  cart.push({
+    id:reservationId,
+    pullId,
+    isBoxPull:true,
+    name:poolItem.name,
+    productName:poolItem.productName,
+    seriesName:poolItem.seriesName,
+    characterId:poolItem.characterId,
+    rarity:poolItem.rarity,
+    odds:poolItem.odds,
+    image:poolItem.image,
+    price:poolItem.price,
+    qty:1,
+    offerExpiresAt,
+    modelUrl:poolItem.character.modelUrl,
+    modelOrientation:poolItem.character.modelOrientation,
+  });
+  if(!saveCart()){
+    cart.pop();
+    return false;
+  }
+  updateCartBadge();
+  toast(`${poolItem.name} reservation added to cart`);
+  return true;
+}
+function isPullOfferExpired(line){
+  const expiresAt = Number(line.offerExpiresAt);
+  return Boolean(line.isBoxPull) && (!Number.isFinite(expiresAt) || expiresAt <= Date.now());
+}
+function addPurchasedItemsToCollection(lines){
+  let collection;
+  try{
+    const raw = localStorage.getItem('joytrinkets_collection');
+    const stored = raw ? JSON.parse(raw) : [];
+    if(!Array.isArray(stored)) throw new Error('Saved collection data is not a list.');
+    collection = stored;
+  }catch(error){
+    console.error('Could not read the collection for checkout.', error);
+    toast('Your collection could not be updated; your cart is unchanged');
+    return false;
+  }
+  const recordedPurchases = new Set(collection.map(item=>item.purchaseId).filter(Boolean));
+  for(const line of lines){
+    if(recordedPurchases.has(line.id)) continue;
+    const isPulledCharacter = line.isBoxPull;
+    collection.push({
+      purchaseId:line.id,
+      kind:isPulledCharacter ? 'character' : 'series',
+      name:isPulledCharacter ? line.name : (line.productName || line.name),
+      productName:line.productName || line.name,
+      seriesName:line.seriesName || line.productName || line.name,
+      qty:line.qty,
+      image:line.image || '',
+      price:line.price,
+      characterId:isPulledCharacter ? line.characterId : '',
+      rarity:isPulledCharacter ? line.rarity : '',
+      odds:isPulledCharacter ? line.odds : '',
+      modelUrl:isPulledCharacter ? line.modelUrl : '',
+      modelOrientation:isPulledCharacter ? line.modelOrientation : null,
+    });
+    recordedPurchases.add(line.id);
+  }
+  return saveCollection(collection);
 }
 function updateCartBadge(){
   const el = document.getElementById('cartCount');
@@ -251,49 +559,60 @@ function cartTotal(){
 }
 
 /* ================= Modal system ================= */
+let modalReturnState = null;
+
 function openModal(html){
   const overlay = document.getElementById('modalOverlay');
   const body = document.getElementById('modalBody');
   if(!overlay || !body) return;
-  stopScaleCamera();
+  modalReturnState = null;
+  disposeGaussianViewer();
   body.innerHTML = html;
   const modalBox = overlay.querySelector('.modal-box');
-  if(modalBox) modalBox.classList.toggle('modal-box-wide', Boolean(body.querySelector('.character-viewer, .scale-viewer')));
+  if(modalBox){
+    const wide = Boolean(body.querySelector('.character-viewer, .model-viewer, .trade-proposal, .trade-form-panel'));
+    modalBox.classList.toggle('modal-box-wide', wide);
+    modalBox.classList.toggle('modal-box-trade', Boolean(body.querySelector('.trade-proposal, .trade-form-panel')));
+  }
   overlay.classList.add('open');
 }
-let activeCameraStream = null;
-let cameraRequestVersion = 0;
+let activeGaussianViewer = null;
+let activeModelLoadTimeout = null;
+let modelViewerRequestVersion = 0;
 let activeCharacterProduct = null;
 let activeCharacterIndex = 0;
 
-function closeModal(){
-  stopScaleCamera();
+function closeModal(event){
+  if(event) event.stopPropagation();
+  const returnState = modalReturnState;
+  modalReturnState = null;
+  disposeGaussianViewer();
   const overlay = document.getElementById('modalOverlay');
-  if(overlay) overlay.classList.remove('open');
+  if(returnState && returnState.type === 'trade-proposal'){
+    renderTradeProposalModal(returnState.listingId, returnState.formState);
+  }else if(returnState){
+    renderCharacterModal(returnState.product, returnState.index);
+  }else if(overlay){
+    overlay.classList.remove('open');
+  }
 }
 
-function stopScaleCamera(){
-  cameraRequestVersion++;
-  if(activeCameraStream){
-    activeCameraStream.getTracks().forEach(track=>track.stop());
-    activeCameraStream = null;
-  }
-  const body = document.getElementById('modalBody');
-  if(body){
-    const video = body.querySelector('[data-camera-video]');
-    if(video) video.srcObject = null;
-    const stage = body.querySelector('[data-camera-stage]');
-    if(stage) stage.hidden = true;
-    const start = body.querySelector('[data-camera-start]');
-    if(start){
-      start.hidden = false;
-      start.disabled = false;
-      start.textContent = 'Start camera';
+function disposeGaussianViewer(){
+  modelViewerRequestVersion++;
+  clearTimeout(activeModelLoadTimeout);
+  activeModelLoadTimeout = null;
+  const viewer = activeGaussianViewer;
+  activeGaussianViewer = null;
+  if(viewer){
+    const rootElement = viewer.rootElement;
+    if(rootElement && rootElement.parentElement !== document.body){
+      // Viewer.dispose() removes its rootElement directly from document.body.
+      rootElement.style.display = 'none';
+      document.body.appendChild(rootElement);
     }
-    const sizeControl = body.querySelector('[data-camera-size-control]');
-    if(sizeControl) sizeControl.hidden = true;
-    const fallback = body.querySelector('[data-camera-fallback]');
-    if(fallback) fallback.hidden = true;
+    viewer.stop();
+    if(viewer.renderer) viewer.renderer.forceContextLoss();
+    viewer.dispose().catch(error=>console.error('Could not fully dispose the 3D model viewer.', error));
   }
 }
 
@@ -317,7 +636,7 @@ function renderCharacterModal(product, index=0){
         <h4>${escAttr(character.name)}</h4><span class="rarity-badge ${character.rarity === 'Secret Chase' ? 'rarity-secret' : 'rarity-common'}">${escAttr(character.rarity)}</span>
         <p>Pull odds <b>${escAttr(character.odds)}</b> <span class="character-height">· ${figureHeightText(product.heightCm)}</span></p>
         <div class="character-thumbnails" aria-label="Choose a character">${product.characters.map((item, itemIndex)=>`<button type="button" class="character-thumb ${itemIndex === activeCharacterIndex ? 'active' : ''}" data-character-index="${itemIndex}" aria-label="View ${escAttr(item.name)}">${placeholderBox(item.name, item.image)}</button>`).join('')}</div>
-        <div class="character-actions"><button class="btn btn-primary" type="button" data-character-add ${product.tag === 'tag-soldout' ? 'disabled' : ''}>Add Blind Box to Cart</button><button class="btn btn-outline" type="button" data-size-preview>📏 See on hand / actual size</button></div>
+        <div class="character-actions"><button class="btn btn-primary" type="button" data-character-add ${product.tag === 'tag-soldout' ? 'disabled' : ''}>Add Blind Box to Cart</button>${product.modelPreview ? `<button class="btn btn-outline" type="button" data-model-preview data-character-id="${escAttr(character.id)}" data-character-name="${escAttr(character.name)}">See 3D Model</button>` : ''}</div>
       </div>
     </div>`);
   const body = document.getElementById('modalBody');
@@ -326,112 +645,102 @@ function renderCharacterModal(product, index=0){
   body.querySelectorAll('[data-character-index]').forEach(button=>button.addEventListener('click', ()=>renderCharacterModal(product, Number(button.dataset.characterIndex))));
   const addButton = body.querySelector('[data-character-add]');
   if(addButton) addButton.addEventListener('click', ()=>addToCart(product));
-  body.querySelector('[data-size-preview]').addEventListener('click', ()=>renderScalePreview(product, character));
-}
-
-function renderScalePreview(product, character){
-  stopScaleCamera();
-  const heightCm = product.heightCm || 6.5;
-  const figureName = character ? character.name : product.name;
-  const figureImage = character ? character.image : product.image;
-  openModal(`
-    <div class="scale-viewer">
-      <span class="kicker">True-scale preview</span><h3>${escAttr(character ? character.name : product.name)}</h3>
-      <p class="modal-sub">Figure height: <b>${figureHeightText(heightCm)}</b></p>
-      <div class="scale-tabs" role="tablist"><button class="scale-tab active" type="button" data-scale-tab="objects" role="tab" aria-selected="true">In-Hand &amp; Object Scale</button><button class="scale-tab" type="button" data-scale-tab="camera" role="tab" aria-selected="false">Live Camera Hand Overlay</button></div>
-      <section class="scale-panel" data-scale-panel="objects">
-        <div class="object-scale-controls"><label for="scaleObject">Compare with</label><select id="scaleObject"><option value="18">Open Palm (18 cm)</option><option value="14.7">Smartphone (14.7 cm)</option><option value="2.7">₱10 Coin (2.7 cm)</option></select></div>
-        <div class="object-scale-stage">
-          <div class="scale-ruler" style="height:${heightCm}cm"><span>${heightCm} cm</span></div>
-          <div class="scale-figure" style="height:${heightCm}cm">${placeholderBox(character ? character.name : product.name, character ? character.image : product.image)}</div>
-          <div class="scale-object palm" data-object-visual style="height:18cm; --object-height:18cm; --object-width:8.1cm"><span>Open Palm · 18 cm</span></div>
-        </div>
-        <p class="scale-disclaimer">Displayed at proportional CSS scale. Actual physical size on screen varies by device, display settings, and zoom.</p>
-      </section>
-      <section class="scale-panel camera-panel" data-scale-panel="camera" hidden>
-        <p class="camera-help">Allow camera access, then hold your palm up to compare the figure size.</p>
-        <button class="btn btn-outline camera-start" type="button" data-camera-start>Start camera</button>
-        <div class="camera-stage" data-camera-stage hidden><video data-camera-video autoplay playsinline muted></video><div class="camera-figure" data-camera-figure aria-label="${escAttr(figureName)}">${placeholderBox(figureName, figureImage)}</div><p class="camera-fallback" data-camera-fallback hidden></p></div>
-        <label class="camera-size-control" data-camera-size-control hidden>Figure size <input type="range" min="40" max="420" value="${Math.round(heightCm * 38)}" data-camera-size></label>
-        <p class="scale-disclaimer">Camera preview is local to this device. Physical sizing may vary with camera distance and display settings.</p>
-      </section>
-    </div>`);
-  const body = document.getElementById('modalBody');
-  const objectSelect = body.querySelector('#scaleObject');
-  const objectVisual = body.querySelector('[data-object-visual]');
-  objectSelect.addEventListener('change', ()=>{
-    const cm = Number(objectSelect.value);
-    objectVisual.style.height = `${cm}cm`;
-    objectVisual.style.setProperty('--object-height', `${cm}cm`);
-    objectVisual.style.setProperty('--object-width', `${cm * (cm === 2.7 ? 1 : 0.48)}cm`);
-    objectVisual.classList.toggle('palm', cm === 18);
-    objectVisual.classList.toggle('phone', cm === 14.7);
-    objectVisual.classList.toggle('coin', cm === 2.7);
-    objectVisual.querySelector('span').textContent = `${objectSelect.options[objectSelect.selectedIndex].text}`;
-  });
-  body.querySelectorAll('[data-scale-tab]').forEach(tab=>tab.addEventListener('click', async ()=>{
-    stopScaleCamera();
-    body.querySelectorAll('[data-scale-tab]').forEach(item=>{
-      const active = item === tab;
-      item.classList.toggle('active', active);
-      item.setAttribute('aria-selected', String(active));
+  const modelPreviewButton = body.querySelector('[data-model-preview]');
+  if(modelPreviewButton){
+    modelPreviewButton.addEventListener('click', event=>{
+      const button = event.currentTarget;
+      renderModelViewer(product, button.dataset.characterId, button.dataset.characterName, character);
     });
-    body.querySelectorAll('[data-scale-panel]').forEach(panel=>panel.hidden = panel.dataset.scalePanel !== tab.dataset.scaleTab);
-    if(tab.dataset.scaleTab === 'camera') await startScaleCamera(body, character, product);
-  }));
+  }
 }
 
-async function startScaleCamera(body, character, product){
-  const requestVersion = ++cameraRequestVersion;
-  const start = body.querySelector('[data-camera-start]');
-  const stage = body.querySelector('[data-camera-stage]');
-  const video = body.querySelector('[data-camera-video]');
-  const fallback = body.querySelector('[data-camera-fallback]');
-  const sizeControl = body.querySelector('[data-camera-size-control]');
-  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-    stage.hidden = false;
-    fallback.hidden = false;
-    fallback.textContent = 'Camera preview is not available in this browser or connection. Try a secure HTTPS page or use the object scale tab.';
-    return;
-  }
-  start.disabled = true;
-  start.textContent = 'Requesting camera…';
+function renderModelViewer(product, characterId='', displayName=product.name, character=null, customReturnState=null){
+  const returnState = customReturnState || (document.querySelector('#modalOverlay.open #modalBody .character-viewer')
+    ? {product:activeCharacterProduct, index:activeCharacterIndex}
+    : null);
+  const registryEntry = CHARACTER_MODELS[characterId] || {};
+  const modelUrl = (character && character.modelUrl) || registryEntry.url || product.modelUrl || DEFAULT_MODEL_URL;
+  const orientation = {
+    ...MODEL_VIEWER_SETTINGS,
+    ...(product.modelOrientation || {}),
+    ...registryEntry,
+    ...((character && character.modelOrientation) || {}),
+  };
+  openModal(`
+    <div class="model-viewer">
+      <span class="kicker">3D model</span><h3>${escAttr(displayName)}</h3>
+      <p class="modal-sub">Drag to rotate · scroll or pinch to zoom</p>
+      <div class="model-viewer-stage" data-model-stage>
+        <div class="model-loading" data-model-loading role="status"><span class="model-spinner" aria-hidden="true"></span><span>Loading 3D model…</span></div>
+        <p class="model-error" data-model-error role="alert" hidden>Could not load this 3D model. Check that the model file is available, then try again.</p>
+      </div>
+      <div class="model-viewer-actions">
+        <button class="btn btn-outline" type="button" data-model-reset disabled>Reset View</button>
+        <button class="btn btn-outline" type="button" data-model-close>Close</button>
+      </div>
+    </div>`);
+  modalReturnState = returnState;
+
+  const requestVersion = modelViewerRequestVersion;
+  const overlay = document.getElementById('modalOverlay');
+  const body = document.getElementById('modalBody');
+  const stage = body.querySelector('[data-model-stage]');
+  const loading = body.querySelector('[data-model-loading]');
+  const resetButton = body.querySelector('[data-model-reset]');
+  const loadError = body.querySelector('[data-model-error]');
+  let timedOut = false;
+  body.querySelector('[data-model-close]').addEventListener('click', closeModal);
+  resetButton.addEventListener('click', ()=>{
+    if(activeGaussianViewer && activeGaussianViewer.controls) activeGaussianViewer.controls.reset();
+  });
+
   try{
-    const stream = await navigator.mediaDevices.getUserMedia({video:true});
-    const overlay = document.getElementById('modalOverlay');
-    const cameraPanel = body.querySelector('[data-scale-panel="camera"]');
-    if(requestVersion !== cameraRequestVersion || !body.isConnected || !overlay.classList.contains('open') || !cameraPanel || cameraPanel.hidden){
-      stream.getTracks().forEach(track=>track.stop());
-      return;
-    }
-    activeCameraStream = stream;
-    video.srcObject = stream;
-    stage.hidden = false;
-    sizeControl.hidden = false;
-    start.hidden = true;
-    const figure = body.querySelector('[data-camera-figure]');
-    const slider = body.querySelector('[data-camera-size]');
-    slider.addEventListener('input', ()=>figure.style.height = `${slider.value}px`);
-    let dragging = false;
-    figure.addEventListener('pointerdown', event=>{ dragging = true; figure.setPointerCapture(event.pointerId); });
-    figure.addEventListener('pointerup', ()=>dragging = false);
-    figure.addEventListener('pointercancel', ()=>dragging = false);
-    figure.addEventListener('pointermove', event=>{
-      if(!dragging) return;
-      const rect = stage.getBoundingClientRect();
-      figure.style.left = `${Math.max(0, Math.min(100, (event.clientX - rect.left) / rect.width * 100))}%`;
-      figure.style.top = `${Math.max(0, Math.min(100, (event.clientY - rect.top) / rect.height * 100))}%`;
+    const viewer = new GaussianSplats3D.Viewer({
+      rootElement:stage,
+      sharedMemoryForWorkers:false,
+      cameraUp:orientation.cameraUp,
+      initialCameraPosition:orientation.cameraPosition,
+      initialCameraLookAt:orientation.initialCameraLookAt,
+    });
+    activeGaussianViewer = viewer;
+    activeModelLoadTimeout = setTimeout(()=>{
+      activeModelLoadTimeout = null;
+      if(requestVersion !== modelViewerRequestVersion) return;
+      timedOut = true;
+      console.error(`Timed out loading 3D model "${modelUrl}" for "${displayName}".`);
+      loading.hidden = true;
+      loadError.textContent = `The 3D model for ${displayName} did not finish loading. Check that "${modelUrl}" exists and try again.`;
+      loadError.hidden = false;
+    }, 45000);
+    viewer.addSplatScene(modelUrl, {
+      splatAlphaRemovalThreshold:5,
+      showLoadingUI:false,
+      rotation:orientation.rotation,
+    }).then(()=>{
+      clearTimeout(activeModelLoadTimeout);
+      activeModelLoadTimeout = null;
+      if(timedOut || requestVersion !== modelViewerRequestVersion || !overlay.classList.contains('open')) return;
+      viewer.controls.minPolarAngle = 0;
+      viewer.controls.maxPolarAngle = Math.PI;
+      viewer.start();
+      loading.hidden = true;
+      resetButton.disabled = false;
+    }).catch(error=>{
+      clearTimeout(activeModelLoadTimeout);
+      activeModelLoadTimeout = null;
+      if(timedOut || requestVersion !== modelViewerRequestVersion) return;
+      console.error(`Could not load 3D model "${modelUrl}" for "${displayName}".`, error);
+      loading.hidden = true;
+      loadError.textContent = `Could not load the 3D model for ${displayName}. Check that "${modelUrl}" exists and try again.`;
+      loadError.hidden = false;
     });
   }catch(error){
-    if(requestVersion !== cameraRequestVersion) return;
-    console.warn('Camera access was unavailable for the size preview.', error);
-    stage.hidden = false;
-    fallback.hidden = false;
-    fallback.textContent = error.name === 'NotAllowedError'
-      ? 'Camera permission was declined. You can enable it in your browser settings, or use the object scale tab.'
-      : 'The camera could not be started. Check that it is available and try again, or use the object scale tab.';
-    start.disabled = false;
-    start.textContent = 'Try camera again';
+    clearTimeout(activeModelLoadTimeout);
+    activeModelLoadTimeout = null;
+    console.error(`Could not initialize 3D model viewer for "${modelUrl}" (${displayName}).`, error);
+    loading.hidden = true;
+    loadError.textContent = `Could not initialize the 3D model for ${displayName}.`;
+    loadError.hidden = false;
   }
 }
 
@@ -446,11 +755,12 @@ function renderCartModal(){
   const itemCount = cartItemCount();
   const subtotal = cartTotal();
   const discount = itemCount >= BUNDLE_DISCOUNT_THRESHOLD ? Math.round(subtotal * BUNDLE_DISCOUNT_RATE) : 0;
+  const hasExpiredPulls = cart.some(isPullOfferExpired);
   const lines = cart.map(l=> `
     <div class="cart-line">
       <div class="cart-line-figure" style="background:var(--surface-2); display:flex; align-items:center; justify-content:center; overflow:hidden;">${l.image ? `<img src="${escAttr(l.image)}" alt="${escAttr(l.name)}" style="width:100%; height:100%; object-fit:cover;" onerror="imgFallback(this)">` : '<span style="font-size:10px; color:var(--muted); text-align:center;">img</span>'}</div>
-      <div class="cart-line-info"><b>${l.name}</b><span>${peso(l.price)} × ${l.qty}</span></div>
-      <button class="cart-remove" data-remove="${l.name}">Remove</button>
+      <div class="cart-line-info"><b>${escAttr(l.name)}</b><span>${l.isBoxPull ? `${escAttr(l.seriesName)} · ${escAttr(l.rarity)} · Revealed Box Pull reservation` : ''}${l.isBoxPull ? '<br>' : ''}${peso(l.price)} × ${l.qty}${isPullOfferExpired(l) ? ' · Offer expired' : ''}</span></div>
+      <button class="cart-remove" data-remove="${escAttr(l.id)}">Remove</button>
     </div>`).join('');
   openModal(`
     <h3>Your cart</h3>
@@ -464,11 +774,12 @@ function renderCartModal(){
     <p class="cart-shipping-note">Shipping is confirmed after your delivery address is reviewed.</p>
     <p class="cart-protection-note">Order protection: review your order before confirming. Payment details are never stored here.</p>
     <div class="payment-badges cart-payment-badges" aria-label="Payment methods available"><span>GCash</span><span>Maya</span><span>Card</span><span>COD</span></div>
-    <button class="btn btn-primary" id="checkoutBtn" style="width:100%; justify-content:center; margin-top:18px;">Continue to checkout</button>`);
+    ${hasExpiredPulls ? '<p class="checkout-offer-warning" role="alert">Remove expired Box Pull reservations before checkout.</p>' : ''}
+    <button class="btn btn-primary" id="checkoutBtn" style="width:100%; justify-content:center; margin-top:18px;" ${hasExpiredPulls ? 'disabled' : ''}>Continue to checkout</button>`);
   const body = document.getElementById('modalBody');
   body.querySelectorAll('[data-remove]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
-      cart = cart.filter(l=> l.name !== btn.dataset.remove);
+      cart = cart.filter(l=> l.id !== btn.dataset.remove);
       saveCart();
       updateCartBadge();
       renderCartModal();
@@ -526,42 +837,431 @@ function renderCatalogModal(){
   });
 }
 
-function listingFigure(l){
-  const match = PRODUCTS.find(p=> p.name === l.name);
-  if(match && match.image){
-    return `<div class="listing-figure" style="background:${l.bg}; overflow:hidden; padding:0;"><img src="${escAttr(match.image)}" alt="${escAttr(l.name)}" style="width:100%; height:100%; object-fit:cover;" onerror="imgFallback(this)"></div>`;
+const TRADE_LISTINGS_STORAGE_KEY = 'joytrinkets_trade_listings';
+const TRADE_DEALS_STORAGE_KEY = 'joytrinkets_trade_deals';
+const TRADE_CONDITIONS = ['With Box', 'With Card', 'Sealed Foil', 'Opened', 'Loose Figure'];
+const TRADE_STAGES = [
+  'Offer Agreed & Escrow Locked',
+  'Shipped / Dropped Off to Joy Trinkets',
+  'In-Store Legit Check',
+  'Dispatched to Receiver',
+  'Delivered & Collection Updated',
+];
+
+function tradeCharacter(productName, characterId){
+  return MARKETPLACE_BY_KEY.get(`${productName}::${characterId}`) || null;
+}
+
+function tradeKey(entry){
+  return `${entry.product.name}::${entry.character.id}`;
+}
+
+function loadTradeListings(){
+  try{
+    const raw = localStorage.getItem(TRADE_LISTINGS_STORAGE_KEY);
+    if(!raw) return [];
+    const stored = JSON.parse(raw);
+    if(!Array.isArray(stored)) throw new Error('Saved trade listings are not a list.');
+    return stored.filter(listing=>{
+      const entry = tradeCharacter(listing.productName, listing.characterId);
+      return entry && ['trade', 'sale', 'trade-or-buy'].includes(listing.type);
+    }).map(listing=>{
+      const entry = tradeCharacter(listing.productName, listing.characterId);
+      return {
+        ...listing,
+        askPrice:entry.product.price,
+        conditions:Array.isArray(listing.conditions) ? listing.conditions.filter(item=>TRADE_CONDITIONS.includes(item)) : [],
+        isoIds:Array.isArray(listing.isoIds) ? listing.isoIds.filter(key=>MARKETPLACE_BY_KEY.has(key)) : [],
+      };
+    });
+  }catch(error){
+    console.error('Could not read marketplace listings.', error);
+    toast('Saved marketplace listings could not be read');
+    return [];
   }
-  return `<div class="listing-figure" style="background:${l.bg};">🎁</div>`;
 }
 
-function listingRow(l){
-  return `
-    <div class="listing-row">
-      ${listingFigure(l)}
-      <div class="listing-info"><b>${l.name} ${l.desc}</b><span>Listed by ${l.by} · ${l.time}</span></div>
-      <span class="escrow-badge">Escrow</span>
-    </div>`;
+function saveTradeListings(listings){
+  try{
+    localStorage.setItem(TRADE_LISTINGS_STORAGE_KEY, JSON.stringify(listings));
+    return true;
+  }catch(error){
+    console.error('Could not save marketplace listings.', error);
+    toast('Your marketplace listing could not be saved');
+    return false;
+  }
 }
 
-function renderListingsModal(){
-  const rows = [...BASE_LISTINGS, ...EXTRA_LISTINGS].map(l=> `
-    <div class="modal-list-item">
-      ${listingFigure(l)}
-      <div class="listing-info" style="flex:1;"><b>${l.name} ${l.desc}</b><span>${l.by} · ${l.time}</span></div>
-      <button class="btn btn-outline btn-sm" data-propose="${l.name}">Propose</button>
-    </div>`).join('');
-  openModal(`<h3>All trade listings</h3><p class="modal-sub">Every trade runs through escrow until both sides confirm.</p>${rows}`);
-  const body = document.getElementById('modalBody');
-  body.querySelectorAll('[data-propose]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{ toast(`Trade proposal sent for ${btn.dataset.propose}`); });
+function loadTradeDeals(){
+  try{
+    const raw = localStorage.getItem(TRADE_DEALS_STORAGE_KEY);
+    if(!raw) return [];
+    const stored = JSON.parse(raw);
+    if(!Array.isArray(stored)) throw new Error('Saved trade deals are not a list.');
+    return stored.filter(deal=>typeof deal.id === 'string' && tradeCharacter(deal.productName, deal.characterId))
+      .map(deal=>({
+        ...deal,
+        stage:Math.floor(Math.max(0, Math.min(5, Number(deal.stage) || 0))),
+        cash:Math.max(0, Number(deal.cash) || 0),
+        delivery:deal.delivery === 'dropoff' ? 'dropoff' : 'courier',
+        offered:Array.isArray(deal.offered) ? deal.offered.filter(item=>
+          item && typeof item.purchaseId === 'string' && tradeCharacter(item.productName, item.characterId)
+        ) : [],
+      }));
+  }catch(error){
+    console.error('Could not read active trade deals.', error);
+    toast('Saved trade deals could not be read');
+    return [];
+  }
+}
+
+function saveTradeDeals(deals){
+  try{
+    localStorage.setItem(TRADE_DEALS_STORAGE_KEY, JSON.stringify(deals));
+    return true;
+  }catch(error){
+    console.error('Could not save active trade deals.', error);
+    toast('Your trade deal could not be saved');
+    return false;
+  }
+}
+
+function ownedTradeCharacters(){
+  return loadCollection().flatMap((item, index)=>{
+    if(item.kind !== 'character' || item.qty < 1 || !item.purchaseId) return [];
+    const entry = tradeCharacter(item.productName, item.characterId);
+    if(!entry) return [];
+    return [{
+      ...entry,
+      item,
+      purchaseId:item.purchaseId,
+      collectionIndex:index,
+    }];
   });
 }
 
+function allTradeListings(){
+  const saved = loadTradeListings();
+  return [...COMMUNITY_LISTINGS, ...saved].filter(listing=>tradeCharacter(listing.productName, listing.characterId));
+}
+
+function listingTypeLabel(listing){
+  if(listing.type === 'sale') return `For Sale · ${peso(listing.askPrice)}`;
+  if(listing.type === 'trade-or-buy') return `Trade or Buy · ${peso(listing.askPrice)}`;
+  return 'For Trade';
+}
+
+function listingImage(entry){
+  return placeholderBox(entry.character.name, entry.character.image || entry.product.image);
+}
+
+function renderTradeListings(filter='all'){
+  const host = document.getElementById('tradeListings');
+  if(!host) return;
+  const ownedKeys = new Set(ownedTradeCharacters().map(tradeKey));
+  const listings = allTradeListings().filter(listing=>{
+    if(filter === 'matches'){
+      return listing.isoIds.some(key=>ownedKeys.has(key));
+    }
+    return filter === 'all' || listing.type === filter;
+  });
+  if(!listings.length){
+    host.innerHTML = `<div class="trade-empty"><b>No matching listings yet.</b><span>Try another filter or post a catalog figure from your Collection.</span></div>`;
+    return;
+  }
+  host.innerHTML = listings.map(listing=>{
+    const entry = tradeCharacter(listing.productName, listing.characterId);
+    const isoNames = listing.isoIds.map(key=>MARKETPLACE_BY_KEY.get(key)).filter(Boolean)
+      .map(item=>`${item.character.name} · ${item.product.series}`);
+    const conditionTags = listing.conditions.map(condition=>`<span class="trade-tag">${escAttr(condition)}</span>`).join('');
+    const isoText = listing.openToOffers || !isoNames.length ? 'Open to offers' : isoNames.map(escAttr).join(', ');
+    const modelAction = entry.product.modelPreview
+      ? `<button type="button" class="btn btn-outline btn-sm" data-trade-model="${escAttr(listing.id)}">See 3D Model</button>`
+      : '';
+    return `<article class="trade-listing-card">
+      <div class="trade-listing-photo">${listingImage(entry)}<span class="rarity-badge ${entry.character.rarity === 'Secret Chase' ? 'rarity-secret' : 'rarity-common'}">${escAttr(entry.character.rarity)}</span></div>
+      <div class="trade-listing-content">
+        <div class="trade-listing-top"><span class="trade-type-badge trade-type-${escAttr(listing.type)}">${escAttr(listingTypeLabel(listing))}</span><span class="escrow-badge">Hub escrow</span></div>
+        <h4>${escAttr(entry.character.name)}</h4><p class="trade-series">${escAttr(entry.product.series)}</p>
+        <div class="trade-tags">${conditionTags || '<span class="trade-tag">Condition not specified</span>'}</div>
+        <p class="trade-seller">${escAttr(listing.seller || '@collector')} <span class="verified-badge">${listing.community ? `✓ ${Number(listing.verifiedDeals) || 0} demo-verified deals · 100% legit pass` : '✓ Joy Hub check on completion'}</span></p>
+        <p class="trade-iso"><b>ISO:</b> ${isoText}</p>
+        <div class="trade-listing-actions">${modelAction}<button type="button" class="btn btn-primary btn-sm" data-trade-propose="${escAttr(listing.id)}">Propose Trade / Buy</button></div>
+      </div>
+    </article>`;
+  }).join('');
+  host.querySelectorAll('[data-trade-model]').forEach(button=>button.addEventListener('click', ()=>{
+    const listing = allTradeListings().find(item=>item.id === button.dataset.tradeModel);
+    const entry = listing && tradeCharacter(listing.productName, listing.characterId);
+    if(entry) renderModelViewer(entry.product, entry.character.id, entry.character.name, entry.character);
+  }));
+  host.querySelectorAll('[data-trade-propose]').forEach(button=>button.addEventListener('click', ()=>{
+    renderTradeProposalModal(button.dataset.tradePropose);
+  }));
+}
+
+function collectionOptionLabel(owned){
+  return `${owned.character.name} · ${owned.product.series} · Qty ${owned.item.qty}`;
+}
+
+function renderTradePostModal(){
+  const owned = ownedTradeCharacters();
+  const defaultEntry = owned[0] || MARKETPLACE_CHARACTERS[0];
+  const figureOptions = MARKETPLACE_CHARACTERS.map(entry=>`<option value="${escAttr(tradeKey(entry))}">${escAttr(entry.character.name)} · ${escAttr(entry.product.series)} — Catalog</option>`).join('');
+  const ownedOptions = owned.map(entry=>`<option value="${escAttr(tradeKey(entry))}">${escAttr(collectionOptionLabel(entry))}</option>`).join('');
+  const isoOptions = MARKETPLACE_CHARACTERS.map(entry=>`<option value="${escAttr(tradeKey(entry))}">${escAttr(entry.character.name)} · ${escAttr(entry.product.series)}</option>`).join('');
+  const signedIn = getSignedInEmail();
+  const sellerHandle = signedIn ? `@${signedIn.split('@')[0].replace(/[^a-zA-Z0-9._-]/g, '').slice(0,24) || 'collector'}` : '@collector';
+  openModal(`<div class="trade-form-panel">
+    <span class="kicker">New marketplace listing</span><h3>Post a Trade / Sale Listing</h3>
+    <p class="modal-sub">Choose an exact character from your Collection or the existing catalog. Listing price and item details stay aligned with the catalog.</p>
+    <form id="tradePostForm">
+      <label class="trade-field">Figure<select name="figure" required>
+        ${owned.length ? `<optgroup label="Your Collection">${ownedOptions}</optgroup>` : ''}
+        <optgroup label="Existing catalog">${figureOptions}</optgroup>
+      </select></label>
+      <label class="trade-field">Listing type<select name="type" required><option value="trade">For Trade</option><option value="sale">For Sale</option><option value="trade-or-buy">Trade or Buy</option></select></label>
+      <fieldset class="trade-field"><legend>Condition &amp; completeness</legend><div class="trade-check-grid">${TRADE_CONDITIONS.map((condition,index)=>`<label><input type="checkbox" name="conditions" value="${escAttr(condition)}" ${index === 0 ? 'checked' : ''}> ${escAttr(condition)}</label>`).join('')}</div></fieldset>
+      <label class="trade-field">Asking price (₱)<input name="price" type="number" value="${defaultEntry.product.price}" readonly aria-describedby="tradePriceNote"></label>
+      <small id="tradePriceNote" class="trade-field-note">Uses the selected figure’s exact catalog price.</small>
+      <label class="trade-field">ISO — select existing catalog figures <select name="iso" multiple size="5">${isoOptions}</select></label>
+      <label class="trade-check"><input name="openOffers" type="checkbox" checked> Also open to other catalog offers</label>
+      <button class="btn btn-primary" type="submit">Publish listing</button>
+    </form>
+  </div>`);
+  const form = document.getElementById('tradePostForm');
+  const figureSelect = form.elements.figure;
+  if(defaultEntry) figureSelect.value = tradeKey(defaultEntry);
+  figureSelect.addEventListener('change', ()=>{
+    const entry = MARKETPLACE_BY_KEY.get(figureSelect.value);
+    if(entry) form.elements.price.value = entry.product.price;
+  });
+  form.addEventListener('submit', event=>{
+    event.preventDefault();
+    const entry = MARKETPLACE_BY_KEY.get(figureSelect.value);
+    const conditions = [...form.querySelectorAll('[name="conditions"]:checked')].map(input=>input.value);
+    if(!entry || !conditions.length){
+      toast('Choose a catalog figure and at least one condition');
+      return;
+    }
+    const selectedIso = [...form.elements.iso.selectedOptions].map(option=>option.value).filter(key=>MARKETPLACE_BY_KEY.has(key));
+    const listings = loadTradeListings();
+    listings.unshift({
+      id:createLocalId('listing'),
+      productName:entry.product.name,
+      characterId:entry.character.id,
+      type:form.elements.type.value,
+      askPrice:entry.product.price,
+      conditions,
+      seller:sellerHandle,
+      verifiedDeals:0,
+      isoIds:selectedIso,
+      openToOffers:form.elements.openOffers.checked || selectedIso.length === 0,
+    });
+    if(!saveTradeListings(listings)) return;
+    closeModal();
+    document.querySelector('[data-trade-filter="all"]').click();
+    document.querySelector('[data-trade-tab="listings"]').click();
+    renderTradeListings('all');
+    toast('Your catalog listing is live');
+  });
+}
+
+function tradeOfferFormState(body){
+  const form = body.querySelector('#tradeProposalForm');
+  if(!form) return {};
+  return {
+    offered: [...form.querySelectorAll('[name="offered"]:checked')].map(input=>input.value),
+    cash:form.elements.cash.value,
+    delivery:form.elements.delivery.value,
+    fullBuy:form.elements.fullBuy ? form.elements.fullBuy.checked : false,
+  };
+}
+
+function renderTradeProposalModal(listingId, restoredState={}){
+  const listing = allTradeListings().find(item=>item.id === listingId);
+  const entry = listing && tradeCharacter(listing.productName, listing.characterId);
+  if(!listing || !entry){
+    toast('This marketplace listing is no longer available');
+    return;
+  }
+  const owned = ownedTradeCharacters();
+  const isoNames = listing.isoIds.map(key=>MARKETPLACE_BY_KEY.get(key)).filter(Boolean)
+    .map(item=>`${item.character.name} · ${item.product.series}`);
+  const requiresPurchase = listing.type === 'sale';
+  const canBuy = listing.type !== 'trade';
+  const cashValue = restoredState.cash ?? (requiresPurchase ? entry.product.price : 0);
+  const offerRows = owned.length ? owned.map((item,index)=>{
+    const checked = (restoredState.offered || []).includes(item.purchaseId);
+    return `<label class="trade-offer-item"><input type="checkbox" name="offered" value="${escAttr(item.purchaseId)}" ${checked ? 'checked' : ''}><span>${escAttr(item.character.name)}<small>${escAttr(item.product.series)} · ${escAttr(item.character.rarity)} · Qty ${item.item.qty}</small></span><b>${peso(item.product.price)}</b></label>`;
+  }).join('') : `<p class="trade-empty-inline">Your Collection has no individually identified figures to offer yet. Add a revealed Box Pull figure to your Collection first.</p>`;
+  const previewButton = entry.product.modelPreview
+    ? `<button type="button" class="btn btn-outline btn-sm" data-proposal-model>See 3D Model</button>`
+    : '';
+  openModal(`<div class="trade-proposal">
+    <span class="kicker">Deal builder · Joy Trinkets Legit Check &amp; Escrow</span><h3>Propose Trade / Buy</h3>
+    <div class="trade-proposal-columns">
+      <section class="trade-proposal-target">
+        <h4>Target figure</h4>
+        <div class="trade-target-photo">${listingImage(entry)}</div>
+        <span class="rarity-badge ${entry.character.rarity === 'Secret Chase' ? 'rarity-secret' : 'rarity-common'}">${escAttr(entry.character.rarity)}</span>
+        <h4>${escAttr(entry.character.name)}</h4><p>${escAttr(entry.product.series)}</p>
+        <p><b>${escAttr(listingTypeLabel(listing))}</b></p>
+        <div class="trade-tags">${listing.conditions.map(condition=>`<span class="trade-tag">${escAttr(condition)}</span>`).join('')}</div>
+        <p class="trade-iso"><b>Seller ISO:</b> ${listing.openToOffers || !isoNames.length ? 'Open to offers' : isoNames.map(escAttr).join(', ')}</p>
+        ${previewButton}
+      </section>
+      <form class="trade-proposal-offer" id="tradeProposalForm">
+        <h4>Your offer</h4>
+        <fieldset class="trade-field"><legend>Figures from your Collection</legend><div class="trade-offer-list">${offerRows}</div></fieldset>
+        ${canBuy ? `<label class="trade-check"><input type="checkbox" name="fullBuy" ${requiresPurchase || restoredState.fullBuy ? 'checked' : ''} ${requiresPurchase ? 'disabled' : ''}> Pay full asking price (${peso(entry.product.price)})</label>` : ''}
+        <label class="trade-field">Cash top-up / payment (₱)<input name="cash" type="number" min="0" step="1" value="${Number(cashValue) || 0}" ${requiresPurchase || restoredState.fullBuy ? 'disabled' : ''}></label>
+        <label class="trade-field">Delivery method<select name="delivery"><option value="courier" ${restoredState.delivery !== 'dropoff' ? 'selected' : ''}>Courier to Joy Trinkets Hub</option><option value="dropoff" ${restoredState.delivery === 'dropoff' ? 'selected' : ''}>Drop Off In-Store</option></select></label>
+        <div class="trade-escrow-breakdown"><b>Legit Check &amp; Escrow Protection</b><span>Catalog target: ${peso(entry.product.price)}</span><span>Offer cash: <strong data-offer-cash>${peso(Number(cashValue) || 0)}</strong></span><span>Hub check &amp; escrow fee: Confirmed at handoff; not charged in this demo</span><small>No payment is collected on this static demo. Figures transfer to Collection only after the final tracker step.</small></div>
+        <button class="btn btn-primary" type="submit">Send offer to seller</button>
+      </form>
+    </div>
+  </div>`);
+  const form = document.getElementById('tradeProposalForm');
+  const fullBuy = form.elements.fullBuy;
+  const cashInput = form.elements.cash;
+  const cashDisplay = form.querySelector('[data-offer-cash]');
+  const syncPayment = ()=>{
+    const fullPayment = Boolean(fullBuy && fullBuy.checked);
+    if(fullPayment) cashInput.value = entry.product.price;
+    cashInput.disabled = requiresPurchase || fullPayment;
+    cashDisplay.textContent = peso(Number(cashInput.value) || 0);
+  };
+  if(fullBuy) fullBuy.addEventListener('change', syncPayment);
+  cashInput.addEventListener('input', ()=>{ cashDisplay.textContent = peso(Number(cashInput.value) || 0); });
+  const modelButton = document.querySelector('#modalBody [data-proposal-model]');
+  if(modelButton){
+    modelButton.addEventListener('click', ()=>{
+      const state = tradeOfferFormState(document.getElementById('modalBody'));
+      renderModelViewer(entry.product, entry.character.id, entry.character.name, entry.character, {type:'trade-proposal', listingId, formState:state});
+    });
+  }
+  form.addEventListener('submit', event=>{
+    event.preventDefault();
+    const fullPayment = Boolean(fullBuy && fullBuy.checked);
+    const offeredIds = [...form.querySelectorAll('[name="offered"]:checked')].map(input=>input.value);
+    const currentOwned = ownedTradeCharacters();
+    const offered = offeredIds.map(id=>currentOwned.find(item=>item.purchaseId === id)).filter(Boolean)
+      .map(item=>({purchaseId:item.purchaseId, productName:item.product.name, characterId:item.character.id}));
+    const cash = requiresPurchase || fullPayment ? entry.product.price : Math.max(0, Number(cashInput.value) || 0);
+    if(!requiresPurchase && !offered.length && cash <= 0){
+      toast('Choose a Collection figure or enter a cash top-up');
+      return;
+    }
+    const deals = loadTradeDeals();
+    const deal = {
+      id:createLocalId('deal'),
+      listingId:listing.id,
+      productName:entry.product.name,
+      characterId:entry.character.id,
+      offered,
+      cash,
+      delivery:form.elements.delivery.value,
+      stage:0,
+      accepted:false,
+      createdAt:Date.now(),
+    };
+    deals.unshift(deal);
+    if(!saveTradeDeals(deals)) return;
+    closeModal();
+    document.querySelector('[data-trade-tab="deals"]').click();
+    renderTradeDeals();
+    toast('Offer sent — follow it in My Active Deals');
+  });
+}
+
+function transferTradeDealToCollection(deal){
+  const transferId = `trade-${deal.id}`;
+  let collection;
+  try{
+    const raw = localStorage.getItem('joytrinkets_collection');
+    const stored = raw ? JSON.parse(raw) : [];
+    if(!Array.isArray(stored)) throw new Error('Saved collection data is not a list.');
+    collection = stored;
+  }catch(error){
+    console.error('Could not read the collection for trade completion.', error);
+    toast('Your Collection could not be updated; this deal step was not completed');
+    return false;
+  }
+  if(collection.some(item=>item.purchaseId === transferId)) return true;
+  for(const offered of deal.offered || []){
+    const item = collection.find(record=>record.purchaseId === offered.purchaseId
+      && record.productName === offered.productName && record.characterId === offered.characterId);
+    if(!item || item.qty < 1){
+      toast('An offered figure is no longer in your Collection; transfer was stopped');
+      return false;
+    }
+  }
+  (deal.offered || []).forEach(offered=>{
+    const item = collection.find(record=>record.purchaseId === offered.purchaseId);
+    item.qty--;
+  });
+  const remaining = collection.filter(item=>item.qty > 0);
+  const target = tradeCharacter(deal.productName, deal.characterId);
+  if(!target) return false;
+  remaining.push({
+    purchaseId:transferId,
+    kind:'character',
+    name:target.character.name,
+    productName:target.product.name,
+    seriesName:target.product.series,
+    qty:1,
+    image:target.character.image || target.product.image || '',
+    price:target.product.price,
+    characterId:target.character.id,
+    rarity:target.character.rarity,
+    odds:target.character.odds,
+    modelUrl:target.character.modelUrl || '',
+    modelOrientation:target.character.modelOrientation || null,
+  });
+  return saveCollection(remaining);
+}
+
+function renderTradeDeals(){
+  const host = document.getElementById('tradeDeals');
+  if(!host) return;
+  const deals = loadTradeDeals();
+  if(!deals.length){
+    host.innerHTML = `<div class="trade-empty"><b>No active deals yet.</b><span>Propose a Trade / Buy offer from any marketplace listing to start the Legit Check &amp; Escrow tracker.</span></div>`;
+    return;
+  }
+  host.innerHTML = deals.map(deal=>{
+    const entry = tradeCharacter(deal.productName, deal.characterId);
+    const offeredText = (deal.offered || []).map(offered=>{
+      const target = tradeCharacter(offered.productName, offered.characterId);
+      return target ? target.character.name : '';
+    }).filter(Boolean);
+    const currentStage = deal.stage === 0 ? 'Pending seller agreement' : TRADE_STAGES[deal.stage - 1];
+    return `<article class="trade-deal-card">
+      <div class="trade-deal-summary">${listingImage(entry)}<div><span class="kicker">${deal.stage === 5 ? 'Completed deal' : 'Active deal'}</span><h4>${escAttr(entry.character.name)}</h4><p>${escAttr(entry.product.series)} · ${peso(entry.product.price)}</p></div><span class="trade-deal-status">${escAttr(currentStage)}</span></div>
+      <div class="trade-deal-meta"><span>Offer: ${offeredText.length ? offeredText.map(escAttr).join(', ') : 'Cash only'}${deal.cash ? ` + ${peso(deal.cash)}` : ''}</span><span>Delivery: ${deal.delivery === 'dropoff' ? 'Drop Off In-Store' : 'Courier to Joy Trinkets Hub'}</span></div>
+      <ol class="trade-stage-list">${TRADE_STAGES.map((stage,index)=>`<li class="${deal.stage > index ? 'complete' : deal.stage === index + 1 ? 'current' : ''}"><span>${index + 1}</span><div><b>${escAttr(stage)}</b>${index === 2 ? '<small>Authentic sculpt, paint, foil/box and collector ID card review</small>' : ''}</div></li>`).join('')}</ol>
+      <button class="btn btn-outline btn-sm" type="button" data-trade-next="${escAttr(deal.id)}" ${deal.stage >= 5 ? 'disabled' : ''}>${deal.stage === 0 ? 'Simulate Next Legit Check Step' : deal.stage >= 5 ? 'Deal completed' : 'Simulate Next Legit Check Step'}</button>
+    </article>`;
+  }).join('');
+  host.querySelectorAll('[data-trade-next]').forEach(button=>button.addEventListener('click', ()=>{
+    const updated = loadTradeDeals();
+    const deal = updated.find(item=>item.id === button.dataset.tradeNext);
+    if(!deal || deal.stage >= 5) return;
+    const nextStage = deal.stage + 1;
+    if(nextStage === 5 && !transferTradeDealToCollection(deal)) return;
+    deal.stage = nextStage;
+    deal.accepted = true;
+    if(!saveTradeDeals(updated)) return;
+    renderTradeDeals();
+    toast(nextStage === 5 ? 'Deal completed — your Collection is updated' : TRADE_STAGES[nextStage - 1]);
+  }));
+}
+
 function renderRaffleModal(){
-  const code = 'RAF-' + Math.floor(1000 + Math.random()*8999);
   openModal(`
-    <h3>You're entered! 🎟️</h3>
-    <p class="modal-sub">Entry code <b>${code}</b> for the Walnut Squirrel Family chase run. Winners are drawn live once the timer hits zero — no bots, one entry per verified account.</p>
+    <h3>Chase e-raffle details</h3>
+    <p class="modal-sub">Raffle entries, eligible catalog figures, and draw timing are confirmed by the Joy Trinkets team in-store. No entry or payment is submitted by this demo.</p>
     <button class="btn btn-mint" id="raffleDone" style="width:100%; justify-content:center;">Got it</button>`);
   document.getElementById('modalBody').querySelector('#raffleDone').addEventListener('click', closeModal);
 }
@@ -590,8 +1290,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
   });
 
   const overlay = document.getElementById('modalOverlay');
+  const modalBox = overlay && overlay.querySelector('.modal-box');
   const modalClose = document.getElementById('modalClose');
   if(modalClose) modalClose.addEventListener('click', closeModal);
+  if(modalBox) modalBox.addEventListener('click', event=>event.stopPropagation());
   if(overlay) overlay.addEventListener('click', e=>{ if(e.target === overlay) closeModal(); });
   document.addEventListener('keydown', event=>{
     const characterViewerOpen = document.querySelector('#modalOverlay.open #modalBody .character-viewer');
@@ -645,18 +1347,35 @@ document.addEventListener('DOMContentLoaded', ()=>{
     const checkoutEmpty = document.getElementById('checkoutEmpty');
     const orderConfirmation = document.getElementById('orderConfirmation');
     const checkoutForm = document.getElementById('checkoutForm');
+    const checkoutOfferWarning = document.getElementById('checkoutOfferWarning');
+    const submitButton = checkoutForm.querySelector('[type="submit"]');
     function renderCheckoutSummary(){
       const itemCount = cartItemCount();
       const subtotal = cartTotal();
       const discount = itemCount >= BUNDLE_DISCOUNT_THRESHOLD ? Math.round(subtotal * BUNDLE_DISCOUNT_RATE) : 0;
+      const expiredPulls = cart.filter(isPullOfferExpired);
       checkoutLayout.hidden = itemCount === 0;
       checkoutEmpty.hidden = itemCount !== 0;
       checkoutItems.innerHTML = cart.map(item=>`
         <div class="checkout-item">
           <div class="checkout-item-image">${item.image ? `<img src="${escAttr(item.image)}" alt="${escAttr(item.name)}" onerror="imgFallback(this)">` : '<span>🎁</span>'}</div>
-          <div class="checkout-item-info"><b>${escAttr(item.name)}</b><span>${peso(item.price)} × ${item.qty}</span></div>
+          <div class="checkout-item-info"><b>${escAttr(item.name)}</b><span>${item.isBoxPull ? `${escAttr(item.seriesName)} · ${escAttr(item.rarity)} · Revealed Box Pull reservation<br>` : ''}${peso(item.price)} × ${item.qty}${isPullOfferExpired(item) ? ' · Offer expired' : ''}</span></div>
           <strong>${peso(item.price * item.qty)}</strong>
+          ${isPullOfferExpired(item) ? `<button class="cart-remove" type="button" data-checkout-remove="${escAttr(item.id)}">Remove</button>` : ''}
         </div>`).join('');
+      checkoutItems.querySelectorAll('[data-checkout-remove]').forEach(button=>{
+        button.addEventListener('click', ()=>{
+          cart = cart.filter(item=>item.id !== button.dataset.checkoutRemove);
+          saveCart();
+          updateCartBadge();
+          renderCheckoutSummary();
+        });
+      });
+      checkoutOfferWarning.hidden = expiredPulls.length === 0;
+      checkoutOfferWarning.textContent = expiredPulls.length
+        ? 'One or more Box Pull offers have expired. Remove those reservations from your cart before placing the order.'
+        : '';
+      submitButton.disabled = expiredPulls.length > 0;
       document.getElementById('checkoutItemCount').textContent = `${itemCount} item${itemCount === 1 ? '' : 's'}`;
       document.getElementById('checkoutSubtotal').textContent = peso(subtotal);
       document.getElementById('checkoutDiscount').textContent = discount ? `−${peso(discount)}` : peso(0);
@@ -672,7 +1391,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
     checkoutForm.addEventListener('submit', event=>{
       event.preventDefault();
       if(!checkoutForm.reportValidity() || cartItemCount() === 0) return;
+      if(cart.some(isPullOfferExpired)){
+        renderCheckoutSummary();
+        return;
+      }
+      const purchasedLines = cart.map(item=>({...item}));
+      if(!addPurchasedItemsToCollection(purchasedLines)) return;
       const orderId = 'JT-' + Math.floor(10000 + Math.random()*89999);
+      cart = [];
+      saveCart();
+      updateCartBadge();
       checkoutLayout.hidden = true;
       orderConfirmation.hidden = false;
       document.getElementById('orderNumber').textContent = orderId;
@@ -698,7 +1426,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
       if(document.getElementById('pullTray')) location.reload();
     }
     else if(type === 'catalog') renderCatalogModal();
-    else if(type === 'listings') renderListingsModal();
     else if(type === 'raffle') renderRaffleModal();
     else renderInfoModal(type);
   });
@@ -810,165 +1537,218 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
   /* ---- Page: drops.html — full catalog modal button already wired via [data-modal] ---- */
 
-  /* ---- Page: pull.html — limited to 3 boxes per day ---- */
+  /* ---- Page: pull.html — limited to 3 daily catalog reveals ---- */
   const tray = document.getElementById('pullTray');
   if(tray){
     const vaultOdds = document.getElementById('vaultOdds');
-    vaultOdds.innerHTML = PULL_EXCLUSIVES.map(item=>`
-      <article class="vault-odds-card">
-        <span class="result-rarity ${item.rarityClass}">${escAttr(item.rarityLabel)}</span>
-        <b>${escAttr(item.name)}</b>
-        <span>${item.odds}% chance · ${peso(item.price)}</span>
-      </article>`).join('');
+    const seriesFilter = document.getElementById('pullSeriesFilter');
     const pullPanel = document.getElementById('pullPanel');
     const signInPrompt = document.getElementById('pullSignInPrompt');
+    const result = document.getElementById('pullResult');
+    const pullCountEl = document.getElementById('pullCount');
+    const DAILY_LIMIT = 3;
+    const seriesProducts = PRODUCTS.filter(product=> product.tag !== 'tag-soldout');
+    seriesProducts.forEach(product=>{
+      const option = document.createElement('option');
+      option.value = product.name;
+      option.textContent = product.name;
+      seriesFilter.appendChild(option);
+    });
+
+    function getFilteredPool(){
+      const seriesName = seriesFilter.value;
+      return AVAILABLE_PULL_POOL.filter(item=> seriesName === 'all' || item.productName === seriesName);
+    }
+    function renderOdds(){
+      const pool = getFilteredPool();
+      const totalWeight = pool.reduce((total,item)=> total + item.weight, 0);
+      vaultOdds.innerHTML = pool.map(item=>{
+        const chance = totalWeight ? item.weight / totalWeight * 100 : 0;
+        return `<article class="vault-odds-card">
+          <div class="pull-pool-image">${placeholderBox(item.name, item.image)}</div>
+          <span class="result-rarity ${item.rarityClass}">${escAttr(item.rarity)}</span>
+          <b>${escAttr(item.name)}</b>
+          <span>${escAttr(item.seriesName)}</span>
+          <span>${chance.toFixed(2)}% pool odds · catalog ${escAttr(item.odds)}</span>
+          <strong>${peso(item.price)}</strong>
+        </article>`;
+      }).join('');
+      if(pool.length === 0) vaultOdds.innerHTML = '<p class="vault-demo-note">No available figures in this series.</p>';
+    }
+    seriesFilter.addEventListener('change', renderOdds);
+    renderOdds();
+
     if(!getSignedInEmail()){
       pullPanel.hidden = true;
       signInPrompt.hidden = false;
     }else{
-    const result = document.getElementById('pullResult');
-    const pullCountEl = document.getElementById('pullCount');
-    const DAILY_LIMIT = 3;
-
-    function todayStr(){
-      const d = new Date();
-      return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
-    }
-    function loadDaily(){
-      let daily;
-      try{ daily = JSON.parse(localStorage.getItem('joytrinkets_daily_pull')); }catch(e){ daily = null; }
-      if(!daily || daily.date !== todayStr() || daily.poolVersion !== PULL_POOL_VERSION){
-        daily = {date: todayStr(), poolVersion: PULL_POOL_VERSION, results: []};
+      function todayStr(){
+        const d = new Date();
+        return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
       }
-      return daily;
-    }
-    let daily = loadDaily();
-    function saveDaily(){
-      try{ localStorage.setItem('joytrinkets_daily_pull', JSON.stringify(daily)); }catch(e){ /* ignore */ }
-    }
-    function msUntilNextTray(){
-      const now = new Date();
-      const next = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1, 0, 0, 0);
-      return next - now;
-    }
-    function formatCountdown(ms){
-      if(ms < 0) ms = 0;
-      const h = Math.floor(ms/3600000);
-      const m = Math.floor((ms%3600000)/60000);
-      const s = Math.floor((ms%60000)/1000);
-      return `${h}h ${m}m ${s}s`;
-    }
-    function updateCountText(){
-      const n = daily.results.length;
-      if(n >= DAILY_LIMIT){
-        pullCountEl.innerHTML = `${n} of ${DAILY_LIMIT} boxes opened today · new tray in <span id="pullCountdown">${formatCountdown(msUntilNextTray())}</span>`;
-      } else {
-        pullCountEl.textContent = `${n} of ${DAILY_LIMIT} boxes opened today`;
+      function loadDaily(){
+        let daily;
+        try{ daily = JSON.parse(localStorage.getItem('joytrinkets_daily_pull')); }catch(e){ daily = null; }
+        if(!daily || daily.date !== todayStr() || !Array.isArray(daily.results)){
+          return {date:todayStr(), poolVersion:PULL_POOL_VERSION, results:[]};
+        }
+        if(daily.poolVersion !== PULL_POOL_VERSION){
+          daily.results = daily.results.map(item=>({...item, legacy:!item.poolItemId}));
+          daily.poolVersion = PULL_POOL_VERSION;
+        }
+        return daily;
       }
-    }
-    let offerTimer;
-    function renderResult(r){
-      clearInterval(offerTimer);
-      const product = PULL_EXCLUSIVES.find(p=> p.name === r.name);
-      const offerExpiresAt = Number(r.offerExpiresAt) || 0;
-      const offerExpired = offerExpiresAt <= Date.now();
-      result.innerHTML = `
-        <div class="result-figure">${placeholderBox(r.name, r.image)}</div>
-        <span class="result-rarity ${escAttr(r.rarityClass)}">${escAttr(r.rarityLabel)}</span>
-        <h3 style="font-size:19px; margin-bottom:6px;">${escAttr(r.name)}</h3>
-        <p class="vault-result-note">${product
-          ? `Vault exclusive · ${product.odds}% pull odds. This reveal is a chance to buy, not an item you own.`
-          : 'This pull came from an older vault and is no longer available to buy.'}</p>
-        ${product ? `
-          <p class="vault-offer-countdown" id="vaultOfferCountdown" role="status"></p>
-          <button class="btn btn-primary" id="addPulledFigure" style="margin-top:12px;" ${offerExpired || r.addedToCart ? 'disabled' : ''}>
-            ${r.addedToCart ? 'Added to cart' : `Add to cart · ${peso(product.price)}`}
-          </button>` : ''}`;
-      const addButton = result.querySelector('#addPulledFigure');
-      const countdown = result.querySelector('#vaultOfferCountdown');
-      if(product && countdown){
-        const updateOfferCountdown = ()=>{
-          const remaining = offerExpiresAt - Date.now();
-          if(remaining <= 0){
-            countdown.textContent = 'This 30-minute offer has expired.';
-            if(addButton) addButton.disabled = true;
-            return false;
-          }
-          const minutes = Math.floor(remaining / 60000);
-          const seconds = Math.floor((remaining % 60000) / 1000);
-          countdown.textContent = `Offer ends in ${minutes}:${String(seconds).padStart(2, '0')}`;
+      let daily = loadDaily();
+      function saveDaily(){
+        try{
+          localStorage.setItem('joytrinkets_daily_pull', JSON.stringify(daily));
           return true;
-        };
-        updateOfferCountdown();
-        offerTimer = setInterval(()=>{
-          if(!updateOfferCountdown()) clearInterval(offerTimer);
-        }, 1000);
+        }catch(error){
+          console.error('Could not save Box Pull history.', error);
+          toast('Your pull history could not be saved in this browser');
+          return false;
+        }
       }
-      if(addButton) addButton.addEventListener('click', ()=>{
-        if(Date.now() >= offerExpiresAt || r.addedToCart) return;
-        addToCart(product);
-        r.addedToCart = true;
-        saveDaily();
-        addButton.disabled = true;
-        addButton.textContent = 'Added to cart';
-      });
-    }
-    function buildTray(){
-      tray.innerHTML = '';
-      for(let i=0;i<DAILY_LIMIT;i++){
-        const box = document.createElement('button');
-        box.className = 'pull-box';
-        if(daily.results[i]){
+      function msUntilNextTray(){
+        const now = new Date();
+        const next = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1, 0, 0, 0);
+        return next - now;
+      }
+      function formatCountdown(ms){
+        if(ms < 0) ms = 0;
+        const h = Math.floor(ms/3600000);
+        const m = Math.floor((ms%3600000)/60000);
+        const s = Math.floor((ms%60000)/1000);
+        return `${h}h ${m}m ${s}s`;
+      }
+      function updateCountText(){
+        const n = daily.results.length;
+        if(n >= DAILY_LIMIT){
+          pullCountEl.innerHTML = `${n} of ${DAILY_LIMIT} boxes opened today · new tray in <span id="pullCountdown">${formatCountdown(msUntilNextTray())}</span>`;
+        }else{
+          pullCountEl.textContent = `${n} of ${DAILY_LIMIT} boxes opened today`;
+        }
+      }
+      let offerTimer;
+      function renderResult(pullResult){
+        clearInterval(offerTimer);
+        const poolItem = AVAILABLE_PULL_POOL.find(item=> item.id === pullResult.poolItemId);
+        const offerExpiresAt = Number(pullResult.offerExpiresAt) || 0;
+        const offerExpired = offerExpiresAt <= Date.now();
+        const product = poolItem && poolItem.product;
+        const character = poolItem && poolItem.character;
+        const pullOdds = pullResult.poolOddsLabel || '';
+        result.innerHTML = `
+          <div class="result-figure">${placeholderBox(pullResult.name || 'Unavailable figure', poolItem ? poolItem.image : '')}</div>
+          ${poolItem ? `<p class="pull-result-series">${escAttr(poolItem.seriesName)}</p>` : ''}
+          <span class="result-rarity ${escAttr(poolItem ? poolItem.rarityClass : 'rarity-common')}">${escAttr(poolItem ? poolItem.rarity : (pullResult.rarity || 'Unavailable'))}</span>
+          <h3 class="pull-result-name">${escAttr(poolItem ? poolItem.name : (pullResult.name || 'Unavailable figure'))}</h3>
+          <p class="vault-result-note">${poolItem
+            ? `${pullOdds} pool odds. This is a revealed in-store figure, not a purchase until checkout.`
+            : 'This older pull is no longer available to reserve.'}</p>
+          ${product ? `<p class="pull-result-price">${peso(poolItem.price)}</p>` : ''}
+          ${product && product.modelPreview ? '<button class="btn btn-outline" id="previewPulledFigure" type="button">See 3D Model</button>' : ''}
+          ${product ? `
+            <p class="vault-offer-countdown" id="vaultOfferCountdown" role="status"></p>
+            <button class="btn btn-primary" id="addPulledFigure" style="margin-top:12px;" ${offerExpired || pullResult.addedToCart ? 'disabled' : ''}>
+              ${pullResult.addedToCart ? 'Added to cart' : `Add to cart · ${peso(poolItem.price)}`}
+            </button>` : ''}`;
+        const addButton = result.querySelector('#addPulledFigure');
+        const previewButton = result.querySelector('#previewPulledFigure');
+        if(previewButton){
+          previewButton.addEventListener('click', ()=>renderModelViewer(product, character.id, character.name, character));
+        }
+        const countdown = result.querySelector('#vaultOfferCountdown');
+        if(product && countdown){
+          const updateOfferCountdown = ()=>{
+            const remaining = offerExpiresAt - Date.now();
+            if(remaining <= 0){
+              countdown.textContent = 'This 30-minute offer has expired.';
+              if(addButton) addButton.disabled = true;
+              return false;
+            }
+            const minutes = Math.floor(remaining / 60000);
+            const seconds = Math.floor((remaining % 60000) / 1000);
+            countdown.textContent = `Offer ends in ${minutes}:${String(seconds).padStart(2, '0')}`;
+            return true;
+          };
+          updateOfferCountdown();
+          offerTimer = setInterval(()=>{
+            if(!updateOfferCountdown()) clearInterval(offerTimer);
+          }, 1000);
+        }
+        if(addButton) addButton.addEventListener('click', ()=>{
+          if(Date.now() >= offerExpiresAt || pullResult.addedToCart || !poolItem) return;
+          if(!addPulledFigureToCart(poolItem, pullResult.pullId, offerExpiresAt)) return;
+          pullResult.addedToCart = true;
+          saveDaily();
+          addButton.disabled = true;
+          addButton.textContent = 'Added to cart';
+        });
+      }
+      function buildTray(){
+        tray.innerHTML = '';
+        for(let i=0;i<DAILY_LIMIT;i++){
+          const box = document.createElement('button');
+          box.className = 'pull-box';
+          if(daily.results[i]){
+            box.classList.add('opened');
+            box.textContent = '✓';
+            box.disabled = true;
+          }else{
+            box.textContent = '?';
+          }
+          tray.appendChild(box);
+        }
+        if(daily.results.length > 0) renderResult(daily.results[daily.results.length - 1]);
+        else result.innerHTML = '<span class="placeholder-text">Tap a box in the tray to reveal a figure ↖</span>';
+        updateCountText();
+      }
+      tray.addEventListener('click', event=>{
+        const box = event.target.closest('.pull-box');
+        if(!box || box.disabled || daily.results.length >= DAILY_LIMIT) return;
+        const pool = getFilteredPool();
+        const totalWeight = pool.reduce((total,item)=> total + item.weight, 0);
+        if(!totalWeight){
+          toast('No available figures in this pool');
+          return;
+        }
+        box.disabled = true;
+        box.classList.add('shaking');
+        setTimeout(()=>{
+          box.classList.remove('shaking');
           box.classList.add('opened');
           box.textContent = '✓';
-          box.disabled = true;
-        } else {
-          box.textContent = '?';
+          const roll = Math.random() * totalWeight;
+          let cumulativeWeight = 0;
+          const picked = pool.find(item=>{
+            cumulativeWeight += item.weight;
+            return roll < cumulativeWeight;
+          }) || pool[pool.length - 1];
+          const pullResult = {
+            pullId:createLocalId('pull'),
+            poolItemId:picked.id,
+            name:picked.name,
+            rarity:picked.rarity,
+            poolOddsLabel:`${(picked.weight / totalWeight * 100).toFixed(2)}%`,
+            offerExpiresAt:Date.now() + PULL_OFFER_DURATION,
+          };
+          daily.results.push(pullResult);
+          saveDaily();
+          renderResult(pullResult);
+          updateCountText();
+        }, 500);
+      });
+      setInterval(()=>{
+        if(daily.date !== todayStr()){
+          daily = loadDaily();
+          buildTray();
+          return;
         }
-        tray.appendChild(box);
-      }
-      if(daily.results.length > 0) renderResult(daily.results[daily.results.length - 1]);
-      else result.innerHTML = '<span class="placeholder-text">Tap a box in the tray to pull ↖</span>';
-      updateCountText();
-    }
-    tray.addEventListener('click', e=>{
-      const box = e.target.closest('.pull-box');
-      if(!box || box.disabled || daily.results.length >= DAILY_LIMIT) return;
-      box.classList.add('shaking');
-      setTimeout(()=>{
-        box.classList.remove('shaking');
-        box.classList.add('opened');
-        box.textContent = '✓';
-        box.disabled = true;
-        const roll = Math.random() * 100;
-        let cumulativeOdds = 0;
-        const picked = PULL_EXCLUSIVES.find(item=>{
-          cumulativeOdds += item.odds;
-          return roll < cumulativeOdds;
-        });
-        const pullResult = {
-          name:picked.name,
-          rarityClass:picked.rarityClass,
-          rarityLabel:picked.rarityLabel,
-          offerExpiresAt:Date.now() + PULL_OFFER_DURATION,
-        };
-        daily.results.push(pullResult);
-        saveDaily();
-        renderResult(pullResult);
-        updateCountText();
-      }, 500);
-    });
-    // keep the countdown ticking, and roll over to a fresh tray right at midnight
-    setInterval(()=>{
-      if(daily.date !== todayStr()){
-        daily = loadDaily();
-        buildTray();
-        return;
-      }
-      const el = document.getElementById('pullCountdown');
-      if(el) el.textContent = formatCountdown(msUntilNextTray());
-    }, 1000);
-    buildTray();
+        const countdown = document.getElementById('pullCountdown');
+        if(countdown) countdown.textContent = formatCountdown(msUntilNextTray());
+      }, 1000);
+      buildTray();
     }
   }
 
@@ -977,30 +1757,42 @@ document.addEventListener('DOMContentLoaded', ()=>{
   if(shelfRow){
     const collection = loadCollection();
     const ownedCount = collection.reduce((total,item)=> total + item.qty, 0);
-    const uniqueCount = collection.filter(item=> item.qty > 0 && COLLECTIBLE_PRODUCTS.some(p=> p.name === item.name)).length;
+    const ownedSeries = new Set(collection
+      .filter(item=> item.kind !== 'character' && item.qty > 0)
+      .map(item=> item.productName || item.name)
+      .filter(name=> COLLECTIBLE_PRODUCTS.some(product=>product.name === name)));
+    const ownedCharacters = new Set(collection
+      .filter(item=> item.kind === 'character' && item.qty > 0)
+      .map(item=> `${item.productName}:${item.characterId}`));
+    const uniqueCount = ownedSeries.size + ownedCharacters.size;
+    const trackedCount = COLLECTIBLE_PRODUCTS.length + ownedCharacters.size;
     document.getElementById('collectionCount').textContent =
-      `${uniqueCount} / ${COLLECTIBLE_PRODUCTS.length} unique · ${ownedCount} item${ownedCount === 1 ? '' : 's'} owned`;
+      `${uniqueCount} / ${trackedCount} unique · ${ownedCount} item${ownedCount === 1 ? '' : 's'} owned`;
     document.getElementById('collectionProgress').style.width =
-      `${COLLECTIBLE_PRODUCTS.length ? uniqueCount / COLLECTIBLE_PRODUCTS.length * 100 : 0}%`;
+      `${trackedCount ? uniqueCount / trackedCount * 100 : 0}%`;
     COLLECTIBLE_PRODUCTS.forEach(p=>{
       const slot = document.createElement('div');
-      const item = collection.find(entry=> entry.name === p.name);
-      const owned = item && item.qty > 0;
+      const productItems = collection.filter(entry=> entry.kind !== 'character' && (entry.productName || entry.name) === p.name);
+      const quantity = productItems.reduce((total,item)=>total + (Number(item.qty) || 0), 0);
+      const owned = quantity > 0;
       slot.className = 'shelf-slot' + (owned ? ' filled' : '') + (owned && p.chase ? ' chase' : '');
-      slot.title = `${p.name}${owned ? ` · Qty: ${item.qty}` : ' · Not owned'}`;
+      slot.title = `${p.name}${owned ? ` · Qty: ${quantity}` : ' · Not owned'}`;
       slot.setAttribute('aria-label', slot.title);
       if(owned){
         slot.style.padding = '0';
         slot.style.overflow = 'hidden';
-        slot.innerHTML = `${placeholderBox(p.name, p.image)}<button type="button" class="shelf-size-button" aria-label="Preview actual size of ${escAttr(p.name)}">📏 Size</button>`;
+        slot.innerHTML = `${placeholderBox(p.name, p.image)}${p.modelPreview === false ? '' : `<button type="button" class="shelf-model-button" aria-label="See 3D model of ${escAttr(p.name)}">See 3D Model</button>`}`;
         slot.style.position = 'relative';
-        slot.querySelector('.shelf-size-button').addEventListener('click', event=>{
-          event.stopPropagation();
-          renderScalePreview(p, null);
-        });
+        const modelButton = slot.querySelector('.shelf-model-button');
+        if(modelButton){
+          modelButton.addEventListener('click', event=>{
+            event.stopPropagation();
+            renderModelViewer(p, '', p.name);
+          });
+        }
         const quantity = document.createElement('span');
         quantity.className = 'shelf-quantity';
-        quantity.textContent = `×${item.qty}`;
+        quantity.textContent = `×${productItems.reduce((total,item)=>total + (Number(item.qty) || 0), 0)}`;
         slot.appendChild(quantity);
         if(p.chase){
           const star = document.createElement('span');
@@ -1011,12 +1803,57 @@ document.addEventListener('DOMContentLoaded', ()=>{
       }
       shelfRow.appendChild(slot);
     });
+    collection.filter(item=> item.kind === 'character' && item.qty > 0).forEach(item=>{
+      const product = PRODUCTS.find(entry=> entry.name === item.productName);
+      const character = product && product.characters.find(entry=> entry.id === item.characterId);
+      const slot = document.createElement('div');
+      slot.className = 'shelf-slot filled shelf-character-slot';
+      slot.title = `${item.name} · ${item.seriesName} · ${item.rarity} · Qty: ${item.qty}`;
+      slot.setAttribute('aria-label', slot.title);
+      slot.style.position = 'relative';
+      slot.style.padding = '0';
+      slot.style.overflow = 'hidden';
+      slot.innerHTML = `${placeholderBox(item.name, item.image)}
+        <div class="shelf-character-meta"><b>${escAttr(item.name)}</b><span>${escAttr(item.seriesName)}</span></div>
+        <span class="shelf-character-rarity ${item.rarity === 'Secret Chase' ? 'rarity-secret' : 'rarity-common'}">${escAttr(item.rarity)}</span>
+        ${product && product.modelPreview && character ? `<button type="button" class="shelf-model-button" aria-label="See 3D model of ${escAttr(item.name)}">See 3D Model</button>` : ''}
+        <span class="shelf-quantity">×${item.qty}</span>`;
+      const modelButton = slot.querySelector('.shelf-model-button');
+      if(modelButton){
+        modelButton.addEventListener('click', event=>{
+          event.stopPropagation();
+          renderModelViewer(product, character.id, character.name, character);
+        });
+      }
+      shelfRow.appendChild(slot);
+    });
   }
 
   /* ---- Page: trade.html ---- */
   const tradeListings = document.getElementById('tradeListings');
   if(tradeListings){
-    tradeListings.innerHTML = BASE_LISTINGS.map(listingRow).join('');
+    renderTradeListings();
+    renderTradeDeals();
+    document.querySelectorAll('[data-trade-filter]').forEach(button=>button.addEventListener('click', ()=>{
+      document.querySelectorAll('[data-trade-filter]').forEach(filterButton=>{
+        const active = filterButton === button;
+        filterButton.classList.toggle('active', active);
+        filterButton.setAttribute('aria-pressed', String(active));
+      });
+      renderTradeListings(button.dataset.tradeFilter);
+    }));
+    document.querySelectorAll('[data-trade-tab]').forEach(button=>button.addEventListener('click', ()=>{
+      document.querySelectorAll('[data-trade-tab]').forEach(tab=>{
+        const active = tab === button;
+        tab.classList.toggle('active', active);
+        tab.setAttribute('aria-selected', String(active));
+      });
+      document.querySelectorAll('[data-trade-panel]').forEach(panel=>{
+        panel.hidden = panel.dataset.tradePanel !== button.dataset.tradeTab;
+      });
+      if(button.dataset.tradeTab === 'deals') renderTradeDeals();
+    }));
+    document.querySelector('[data-trade-post]').addEventListener('click', renderTradePostModal);
   }
   if(document.getElementById('tHrs')){
     let totalSecs = 4*3600 + 26*60 + 51;

@@ -7,6 +7,14 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js",
+    "@mkkellogg/gaussian-splats-3d": "https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"
+  }
+}
+</script>
 </head>
 <body>
 
@@ -33,27 +41,45 @@
 <section class="page-section panel-block" style="margin-top:40px;">
   <div class="wrap">
     <div class="section-head">
-      <span class="kicker" style="color:#7A5CE0;">Trading &amp; fair drops</span>
-      <h2>Swap duplicates. Win drops fairly.</h2>
-      <p>Direct peer-to-peer trading with escrow protection, plus e-raffles for anything too limited for a normal checkout.</p>
+      <span class="kicker" style="color:#7A5CE0;">Store-mediated collector marketplace</span>
+      <h2>Trade with confidence.</h2>
+      <p>Browse catalog-backed listings, make an offer, then follow each deal through Joy Trinkets’ in-store Legit Check &amp; Escrow workflow.</p>
     </div>
     <div class="trade-grid">
-      <div class="trade-card">
-        <h3 style="font-size:18px; margin-bottom:6px;">Open trade listings</h3>
-        <p style="color:var(--muted); font-size:13.5px; margin-bottom:6px;">Every trade is held in escrow until both sides confirm.</p>
-        <div id="tradeListings"></div>
-        <button class="btn btn-outline" data-modal="listings" style="margin-top:18px; width:100%; justify-content:center;">Browse all listings</button>
+      <div class="trade-card trade-marketplace">
+        <div class="trade-marketplace-heading">
+          <div><h3>Marketplace</h3><p>Every figure and ISO is selected from the Joy Trinkets catalog or your Collection.</p></div>
+          <button class="btn btn-primary" type="button" data-trade-post>+ Post Trade / Sale Listing</button>
+        </div>
+        <div class="trade-tabs" role="tablist" aria-label="Trade marketplace sections">
+          <button type="button" class="trade-tab active" role="tab" aria-selected="true" data-trade-tab="listings">Marketplace listings</button>
+          <button type="button" class="trade-tab" role="tab" aria-selected="false" data-trade-tab="deals">My Active Deals</button>
+        </div>
+        <div id="tradeListingsPanel" data-trade-panel="listings">
+          <div class="trade-filter-pills" role="group" aria-label="Filter marketplace listings">
+            <button type="button" class="trade-filter active" aria-pressed="true" data-trade-filter="all">All Listings</button>
+            <button type="button" class="trade-filter" aria-pressed="false" data-trade-filter="trade">For Trade</button>
+            <button type="button" class="trade-filter" aria-pressed="false" data-trade-filter="sale">For Sale (₱)</button>
+            <button type="button" class="trade-filter" aria-pressed="false" data-trade-filter="trade-or-buy">Trade or Buy</button>
+            <button type="button" class="trade-filter" aria-pressed="false" data-trade-filter="matches">Matches My Collection</button>
+          </div>
+          <div class="trade-listing-grid" id="tradeListings" aria-live="polite"></div>
+        </div>
+        <div id="tradeDealsPanel" data-trade-panel="deals" hidden>
+          <div id="tradeDeals"></div>
+        </div>
       </div>
       <div class="trade-card accent">
-        <h3 style="font-size:18px; margin-bottom:6px;">Next fair drop: "Walnut Squirrel Family" chase run</h3>
-        <p style="color:var(--muted); font-size:13.5px;">Entry closes soon — every entrant is verified human before the raffle runs.</p>
+        <span class="kicker">Collector event</span>
+        <h3 style="font-size:18px; margin:6px 0;">Next fair drop: Chase e-raffle</h3>
+        <p style="color:var(--muted); font-size:13.5px;">A store-mediated, verified draw. Entry details are confirmed in-store.</p>
         <div class="raffle-timer">
           <div class="timer-box"><b id="tHrs">04</b><span>hrs</span></div>
           <div class="timer-box"><b id="tMin">26</b><span>min</span></div>
           <div class="timer-box"><b id="tSec">51</b><span>sec</span></div>
         </div>
-        <button class="btn btn-mint" data-modal="raffle" style="width:100%; justify-content:center;">Enter the e-raffle</button>
-        <p style="font-size:12px; color:var(--muted); margin-top:14px;">One entry per verified account · winners drawn live</p>
+        <button class="btn btn-mint" data-modal="raffle" style="width:100%; justify-content:center;">View e-raffle details</button>
+        <p style="font-size:12px; color:var(--muted); margin-top:14px;">Entry verification and draw timing are handled by the store.</p>
       </div>
     </div>
   </div>
@@ -94,6 +120,6 @@
 </div>
 <div class="toast" id="toast"></div>
 
-<script src="script.js"></script>
+<script type="module" src="script.js"></script>
 </body>
 </html>

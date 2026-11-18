@@ -7,6 +7,14 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js",
+    "@mkkellogg/gaussian-splats-3d": "https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"
+  }
+}
+</script>
 </head>
 <body>
 
@@ -37,7 +45,7 @@
       <h2 style="font-size:clamp(26px,3.6vw,36px); margin:12px 0 26px;">Track the set. Spot the chase. Skip the guesswork.</h2>
       <ul class="feature-list">
         <li><span class="feature-num">01</span><div><h4>Virtual cabinet</h4><p>Every figure you own is logged automatically, with duplicates and gaps tracked against the full series.</p></div></li>
-        <li><span class="feature-num">02</span><div><h4>True-scale size preview</h4><p>Compare any owned figure with familiar objects or use the live camera overlay to see its approximate size in hand.</p></div></li>
+        <li><span class="feature-num">02</span><div><h4>Interactive 3D models</h4><p>Open supported owned figures in 3D and rotate or zoom to explore them from every angle.</p></div></li>
         <li><span class="feature-num">03</span><div><h4>Chase figure alerts</h4><p>Get notified the moment a secret or low-count figure from a set you're chasing goes up for trade.</p></div></li>
       </ul>
     </div>
@@ -47,7 +55,7 @@
       <div class="shelf-row" id="shelfRow"></div>
       <div class="ar-note">
         <span style="font-size:18px;">📱</span>
-        <div><b>Your figures, all in one place</b><p>Items appear here after checkout. Tap “📏 Size” on an owned figure to preview its scale.</p></div>
+        <div><b>Your figures, all in one place</b><p>Purchased series and exact characters revealed with Box Pull appear here after checkout, with their photo, series, and rarity details.</p></div>
       </div>
     </div>
   </div>
@@ -88,6 +96,6 @@
 </div>
 <div class="toast" id="toast"></div>
 
-<script src="script.js"></script>
+<script type="module" src="script.js"></script>
 </body>
 </html>

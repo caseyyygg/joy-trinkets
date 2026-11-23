@@ -53,9 +53,6 @@
             <h2>Delivery details</h2>
             <p class="checkout-note">Order details and payment preference</p>
             <div class="checkout-assurance">Order protection: review your order before confirming. Card details are not requested or stored on this page.</div>
-            <div class="payment-badges" aria-label="Accepted payment methods">
-              <span>GCash</span><span>Maya</span><span>Card</span><span>COD</span>
-            </div>
             <div class="form-field">
               <label for="checkoutName">Full name</label>
               <input id="checkoutName" name="name" type="text" autocomplete="name" placeholder="Juan Dela Cruz" required>
@@ -65,21 +62,52 @@
               <input id="checkoutEmail" name="email" type="email" autocomplete="email" placeholder="you@email.com" required>
             </div>
             <div class="form-field">
+              <label for="checkoutMobile">Mobile number</label>
+              <input id="checkoutMobile" name="mobile" type="tel" autocomplete="tel" placeholder="09XX XXX XXXX" pattern="^(09[0-9]{9}|09[0-9]{2} [0-9]{3} [0-9]{4})$" inputmode="tel" required>
+              <small class="field-error" id="checkoutMobileError" role="alert"></small>
+            </div>
+            <div class="form-field">
               <label for="checkoutAddress">Delivery address</label>
               <textarea id="checkoutAddress" name="address" autocomplete="street-address" rows="3" placeholder="House number, street, city, and province" required></textarea>
             </div>
             <div class="form-field">
-              <label for="checkoutPayment">Payment method</label>
-              <select id="checkoutPayment" name="payment" required>
-                <option value="">Choose a payment method</option>
-                <option>GCash</option>
-                <option>Maya</option>
-                <option>Credit or debit card</option>
-                <option>Cash on delivery</option>
+              <label for="checkoutRegion">Delivery region / option</label>
+              <select id="checkoutRegion" name="region" required>
+                <option value="metro" selected>Metro Manila Standard / Same-Day — ₱60</option>
+                <option value="luzon">Provincial Luzon — ₱95</option>
+                <option value="vismin">Visayas &amp; Mindanao — ₱135</option>
+                <option value="pickup">In-Store Pickup (Joy Trinkets) — ₱0 (Free)</option>
               </select>
             </div>
+            <div class="form-field">
+              <label for="checkoutNote">Order / Packaging note <span class="optional-label">(optional)</span></label>
+              <input id="checkoutNote" name="note" type="text" placeholder="Bubble wrap box corners">
+            </div>
+            <fieldset class="payment-methods" id="checkoutPaymentMethods">
+              <legend>Payment method</legend>
+              <label class="payment-radio-card">
+                <input type="radio" name="payment" value="GCash" required>
+                <span class="payment-radio-icon">G</span>
+                <span><strong>GCash</strong><small>Pay securely using GCash</small></span>
+              </label>
+              <label class="payment-radio-card">
+                <input type="radio" name="payment" value="Maya">
+                <span class="payment-radio-icon">M</span>
+                <span><strong>Maya</strong><small>Pay with your Maya wallet</small></span>
+              </label>
+              <label class="payment-radio-card">
+                <input type="radio" name="payment" value="Credit / Debit Card">
+                <span class="payment-radio-icon">C</span>
+                <span><strong>Credit / Debit Card</strong><small>Visa or Mastercard payment</small></span>
+              </label>
+              <label class="payment-radio-card">
+                <input type="radio" name="payment" value="Cash on Delivery (COD)">
+                <span class="payment-radio-icon">₱</span>
+                <span><strong>Cash on Delivery (COD)</strong><small>Pay when your order arrives</small></span>
+              </label>
+            </fieldset>
           </div>
-          <button class="btn btn-primary checkout-submit" type="submit">Create order summary</button>
+          <button class="btn btn-primary checkout-submit" type="submit">Place order</button>
         </form>
       </section>
 
@@ -89,16 +117,17 @@
           <span id="checkoutItemCount"></span>
         </div>
         <div id="checkoutItems"></div>
+        <a class="continue-shopping" href="drops.html">← Continue shopping</a>
         <p class="discount-message" id="discountMessage" role="status"></p>
         <p class="checkout-offer-warning" id="checkoutOfferWarning" role="alert" hidden></p>
         <div class="checkout-totals">
           <div><span>Subtotal</span><span id="checkoutSubtotal"></span></div>
           <div><span>Bundle discount</span><span id="checkoutDiscount"></span></div>
-          <div class="checkout-shipping"><span>Shipping</span><span id="checkoutShipping">Confirmed after address review</span></div>
-          <div class="checkout-grand-total"><strong>Items total</strong><strong id="checkoutTotal"></strong></div>
+          <div class="checkout-shipping"><span>Shipping</span><span id="checkoutShipping">₱60</span></div>
+          <div class="checkout-grand-total"><strong>Grand total</strong><strong id="checkoutTotal"></strong></div>
         </div>
-        <p class="checkout-fine-print">Buy 3 or more items to get 10% off your item subtotal. Shipping is confirmed after your delivery address is reviewed.</p>
-        <p class="checkout-preview-note">This storefront preview does not transmit orders or collect payments.</p>
+        <p class="checkout-fine-print">Buy 3 or more items to get 10% off your item subtotal.</p>
+        <p class="checkout-preview-note">This storefront preview keeps the order on this device and does not collect payment details.</p>
       </aside>
     </div>
 
@@ -110,11 +139,11 @@
     </section>
 
     <section class="order-confirmation" id="orderConfirmation" hidden>
-      <div class="icon-badge">✓</div>
-      <span class="kicker">Order preview</span>
-      <h2>Order summary ready</h2>
-      <p>Your local order preview <strong id="orderNumber"></strong> is ready. No order has been transmitted or charged. Purchased figures have been added to your collection.</p>
-      <a class="btn btn-primary" href="drops.html">Keep browsing</a>
+      <div class="receipt-wrap" id="orderReceipt"></div>
+      <div class="receipt-actions">
+        <a class="btn btn-primary" href="shelf.html">View in My Collection →</a>
+        <a class="btn btn-outline" href="drops.html">Continue Shopping</a>
+      </div>
     </section>
   </div>
 </main>

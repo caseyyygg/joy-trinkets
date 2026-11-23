@@ -8,7 +8,6 @@ import * as GaussianSplats3D from '@mkkellogg/gaussian-splats-3d';
 
 /* ================= Utilities ================= */
 const peso = n => '₱' + n.toLocaleString('en-PH');
-const DEFAULT_MODEL_URL = './models/sam3d-splat.ply';
 const MODEL_VIEWER_SETTINGS = {
   cameraUp:[0, 1, 0],
   cameraPosition:[0, 0, 1.8],
@@ -64,9 +63,17 @@ function characterId(name){
   return String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
+function registeredCharacterModel(name){
+  return CHARACTER_MODELS[characterId(name)] || null;
+}
+
+function hasCharacterModel(name){
+  return Boolean(registeredCharacterModel(name)?.url);
+}
+
 function characterModelData(name, modelUrl='', modelOrientation={}){
   const id = characterId(name);
-  const {url, ...registryOrientation} = CHARACTER_MODELS[id] || {};
+  const {url, ...registryOrientation} = registeredCharacterModel(name) || {};
   return {
     id,
     modelUrl:modelUrl || url || '',
@@ -150,7 +157,7 @@ function makeCharacters(names, category, series, secretName, characterImages, se
 function makeSeries({name, category, series, price, tag, tagText, heightCm, image, chase, characters, characterImages, modelUrl, modelOrientation, modelPreview=true}){
   return {
     name, category, series, price, tag, tagText, heightCm, image, chase,
-    modelUrl:modelUrl || DEFAULT_MODEL_URL, modelOrientation:modelOrientation || null, modelPreview,
+    modelUrl:modelUrl || '', modelOrientation:modelOrientation || null, modelPreview,
     characters:makeCharacters(characters, category, series, chase, characterImages, image),
   };
 }
@@ -430,6 +437,34 @@ function createLocalId(prefix){
 }
 const BUNDLE_DISCOUNT_THRESHOLD = 3;
 const BUNDLE_DISCOUNT_RATE = 0.10;
+const SHIPPING_RATES = {
+  metro: 60,
+  luzon: 95,
+  vismin: 135,
+  pickup: 0,
+};
+const SHIPPING_LABELS = {
+  metro: 'Metro Manila Standard / Same-Day',
+  luzon: 'Provincial Luzon',
+  vismin: 'Visayas & Mindanao',
+  pickup: 'In-Store Pickup (Joy Trinkets)',
+};
+
+function getSelectedPayment(){
+  try{
+    return localStorage.getItem('joytrinkets_payment') || '';
+  }catch(error){
+    console.error('Could not read the selected payment method.', error);
+    return '';
+  }
+}
+function setSelectedPayment(method){
+  try{
+    localStorage.setItem('joytrinkets_payment', method);
+  }catch(error){
+    console.error('Could not save the selected payment method.', error);
+  }
+}
 
 function getSignedInEmail(){
   try{
@@ -488,6 +523,7 @@ function addPulledFigureToCart(poolItem, pullId, offerExpiresAt){
     pullId,
     isBoxPull:true,
     name:poolItem.name,
+    characterName:poolItem.character.name,
     productName:poolItem.productName,
     seriesName:poolItem.seriesName,
     characterId:poolItem.characterId,
@@ -531,7 +567,8 @@ function addPurchasedItemsToCollection(lines){
     collection.push({
       purchaseId:line.id,
       kind:isPulledCharacter ? 'character' : 'series',
-      name:isPulledCharacter ? line.name : (line.productName || line.name),
+      name:isPulledCharacter ? (line.characterName || line.name) : (line.productName || line.name),
+      characterName:isPulledCharacter ? (line.characterName || line.name) : '',
       productName:line.productName || line.name,
       seriesName:line.seriesName || line.productName || line.name,
       qty:line.qty,
@@ -636,7 +673,7 @@ function renderCharacterModal(product, index=0){
         <h4>${escAttr(character.name)}</h4><span class="rarity-badge ${character.rarity === 'Secret Chase' ? 'rarity-secret' : 'rarity-common'}">${escAttr(character.rarity)}</span>
         <p>Pull odds <b>${escAttr(character.odds)}</b> <span class="character-height">· ${figureHeightText(product.heightCm)}</span></p>
         <div class="character-thumbnails" aria-label="Choose a character">${product.characters.map((item, itemIndex)=>`<button type="button" class="character-thumb ${itemIndex === activeCharacterIndex ? 'active' : ''}" data-character-index="${itemIndex}" aria-label="View ${escAttr(item.name)}">${placeholderBox(item.name, item.image)}</button>`).join('')}</div>
-        <div class="character-actions"><button class="btn btn-primary" type="button" data-character-add ${product.tag === 'tag-soldout' ? 'disabled' : ''}>Add Blind Box to Cart</button>${product.modelPreview ? `<button class="btn btn-outline" type="button" data-model-preview data-character-id="${escAttr(character.id)}" data-character-name="${escAttr(character.name)}">See 3D Model</button>` : ''}</div>
+        <div class="character-actions"><button class="btn btn-primary" type="button" data-character-add ${product.tag === 'tag-soldout' ? 'disabled' : ''}>Add Blind Box to Cart</button>${product.modelPreview && hasCharacterModel(character.name) ? `<button class="btn btn-outline" type="button" data-model-preview data-character-id="${escAttr(character.id)}" data-character-name="${escAttr(character.name)}">See 3D Model</button>` : ''}</div>
       </div>
     </div>`);
   const body = document.getElementById('modalBody');
@@ -649,21 +686,25 @@ function renderCharacterModal(product, index=0){
   if(modelPreviewButton){
     modelPreviewButton.addEventListener('click', event=>{
       const button = event.currentTarget;
-      renderModelViewer(product, button.dataset.characterId, button.dataset.characterName, character);
+      renderModelViewer(product, button.dataset.characterName, character);
     });
   }
 }
 
-function renderModelViewer(product, characterId='', displayName=product.name, character=null, customReturnState=null){
+function renderModelViewer(product, displayName=product.name, character=null, customReturnState=null){
   const returnState = customReturnState || (document.querySelector('#modalOverlay.open #modalBody .character-viewer')
     ? {product:activeCharacterProduct, index:activeCharacterIndex}
     : null);
-  const registryEntry = CHARACTER_MODELS[characterId] || {};
-  const modelUrl = (character && character.modelUrl) || registryEntry.url || product.modelUrl || DEFAULT_MODEL_URL;
+  const registeredModel = character && registeredCharacterModel(character.name);
+  if(!registeredModel?.url){
+    toast('3D preview is unavailable for this character');
+    return;
+  }
+  const {url:modelUrl, ...registryOrientation} = registeredModel;
   const orientation = {
     ...MODEL_VIEWER_SETTINGS,
     ...(product.modelOrientation || {}),
-    ...registryEntry,
+    ...registryOrientation,
     ...((character && character.modelOrientation) || {}),
   };
   openModal(`
@@ -756,15 +797,34 @@ function renderCartModal(){
   const subtotal = cartTotal();
   const discount = itemCount >= BUNDLE_DISCOUNT_THRESHOLD ? Math.round(subtotal * BUNDLE_DISCOUNT_RATE) : 0;
   const hasExpiredPulls = cart.some(isPullOfferExpired);
+  const remainingForBundle = Math.max(0, BUNDLE_DISCOUNT_THRESHOLD - itemCount);
+  const bundleProgress = itemCount >= BUNDLE_DISCOUNT_THRESHOLD
+    ? `<div class="bundle-progress unlocked">10% Bundle Discount unlocked (−${peso(discount)})</div>`
+    : `<div class="bundle-progress">Add ${remainingForBundle} more box${remainingForBundle === 1 ? '' : 'es'} to unlock 10% off</div>`;
   const lines = cart.map(l=> `
     <div class="cart-line">
       <div class="cart-line-figure" style="background:var(--surface-2); display:flex; align-items:center; justify-content:center; overflow:hidden;">${l.image ? `<img src="${escAttr(l.image)}" alt="${escAttr(l.name)}" style="width:100%; height:100%; object-fit:cover;" onerror="imgFallback(this)">` : '<span style="font-size:10px; color:var(--muted); text-align:center;">img</span>'}</div>
-      <div class="cart-line-info"><b>${escAttr(l.name)}</b><span>${l.isBoxPull ? `${escAttr(l.seriesName)} · ${escAttr(l.rarity)} · Revealed Box Pull reservation` : ''}${l.isBoxPull ? '<br>' : ''}${peso(l.price)} × ${l.qty}${isPullOfferExpired(l) ? ' · Offer expired' : ''}</span></div>
-      <button class="cart-remove" data-remove="${escAttr(l.id)}">Remove</button>
+      <div class="cart-line-info">
+        <b>${escAttr(l.name)}</b>
+        <span class="item-type-subtitle">${l.isBoxPull ? `Box Pull Reveal · ${escAttr(l.seriesName || 'Unboxed Character')}` : 'Sealed Blind Box'}</span>
+        <span>${peso(l.price)} each${isPullOfferExpired(l) ? ' · Offer expired' : ''}</span>
+        <span class="cart-line-total">Line total <strong>${peso(l.price * l.qty)}</strong></span>
+      </div>
+      <div class="cart-line-action">
+        ${l.isBoxPull
+          ? '<span class="box-pull-lock">Box Pull Reveal · 1 reserved</span>'
+          : `<div class="cart-stepper" aria-label="Quantity for ${escAttr(l.name)}">
+              <button type="button" data-cart-minus="${escAttr(l.id)}" aria-label="Decrease quantity">−</button>
+              <strong>${l.qty}</strong>
+              <button type="button" data-cart-plus="${escAttr(l.id)}" aria-label="Increase quantity">+</button>
+            </div>`}
+        <button class="cart-remove" data-remove="${escAttr(l.id)}">Remove</button>
+      </div>
     </div>`).join('');
   openModal(`
     <h3>Your cart</h3>
     <p class="modal-sub">${itemCount} item${itemCount === 1 ? '' : 's'} · packed with care</p>
+    ${bundleProgress}
     ${lines}
     <div class="cart-totals">
       <div><span>Subtotal</span><span>${peso(subtotal)}</span></div>
@@ -773,7 +833,12 @@ function renderCartModal(){
     </div>
     <p class="cart-shipping-note">Shipping is confirmed after your delivery address is reviewed.</p>
     <p class="cart-protection-note">Order protection: review your order before confirming. Payment details are never stored here.</p>
-    <div class="payment-badges cart-payment-badges" aria-label="Payment methods available"><span>GCash</span><span>Maya</span><span>Card</span><span>COD</span></div>
+    <div class="payment-badges cart-payment-badges" aria-label="Payment methods available">
+      ${['GCash','Maya','Credit / Debit Card','Cash on Delivery (COD)'].map(method=>{
+        const short = method === 'Credit / Debit Card' ? 'Card' : method === 'Cash on Delivery (COD)' ? 'COD' : method;
+        return `<button type="button" class="payment-badges payment-pill ${getSelectedPayment() === method ? 'selected' : ''}" data-payment="${escAttr(method)}" aria-pressed="${getSelectedPayment() === method}">${short}</button>`;
+      }).join('')}
+    </div>
     ${hasExpiredPulls ? '<p class="checkout-offer-warning" role="alert">Remove expired Box Pull reservations before checkout.</p>' : ''}
     <button class="btn btn-primary" id="checkoutBtn" style="width:100%; justify-content:center; margin-top:18px;" ${hasExpiredPulls ? 'disabled' : ''}>Continue to checkout</button>`);
   const body = document.getElementById('modalBody');
@@ -783,6 +848,38 @@ function renderCartModal(){
       saveCart();
       updateCartBadge();
       renderCartModal();
+    });
+  });
+  body.querySelectorAll('[data-cart-minus]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const line = cart.find(l=>l.id === btn.dataset.cartMinus);
+      if(!line || line.isBoxPull) return;
+      line.qty--;
+      if(line.qty < 1) cart = cart.filter(l=>l.id !== line.id);
+      saveCart();
+      updateCartBadge();
+      renderCartModal();
+    });
+  });
+  body.querySelectorAll('[data-cart-plus]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const line = cart.find(l=>l.id === btn.dataset.cartPlus);
+      if(!line || line.isBoxPull) return;
+      line.qty++;
+      saveCart();
+      updateCartBadge();
+      renderCartModal();
+    });
+  });
+  body.querySelectorAll('[data-payment]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      setSelectedPayment(btn.dataset.payment);
+      body.querySelectorAll('[data-payment]').forEach(pill=>{
+        const selected = pill.dataset.payment === btn.dataset.payment;
+        pill.classList.toggle('selected', selected);
+        pill.setAttribute('aria-pressed', String(selected));
+      });
+      toast(`${btn.dataset.payment} selected`);
     });
   });
   const checkoutBtn = body.querySelector('#checkoutBtn');
@@ -975,7 +1072,7 @@ function renderTradeListings(filter='all'){
       .map(item=>`${item.character.name} · ${item.product.series}`);
     const conditionTags = listing.conditions.map(condition=>`<span class="trade-tag">${escAttr(condition)}</span>`).join('');
     const isoText = listing.openToOffers || !isoNames.length ? 'Open to offers' : isoNames.map(escAttr).join(', ');
-    const modelAction = entry.product.modelPreview
+    const modelAction = entry.product.modelPreview && hasCharacterModel(entry.character.name)
       ? `<button type="button" class="btn btn-outline btn-sm" data-trade-model="${escAttr(listing.id)}">See 3D Model</button>`
       : '';
     return `<article class="trade-listing-card">
@@ -993,7 +1090,7 @@ function renderTradeListings(filter='all'){
   host.querySelectorAll('[data-trade-model]').forEach(button=>button.addEventListener('click', ()=>{
     const listing = allTradeListings().find(item=>item.id === button.dataset.tradeModel);
     const entry = listing && tradeCharacter(listing.productName, listing.characterId);
-    if(entry) renderModelViewer(entry.product, entry.character.id, entry.character.name, entry.character);
+    if(entry) renderModelViewer(entry.product, entry.character.name, entry.character);
   }));
   host.querySelectorAll('[data-trade-propose]').forEach(button=>button.addEventListener('click', ()=>{
     renderTradeProposalModal(button.dataset.tradePropose);
@@ -1095,7 +1192,7 @@ function renderTradeProposalModal(listingId, restoredState={}){
     const checked = (restoredState.offered || []).includes(item.purchaseId);
     return `<label class="trade-offer-item"><input type="checkbox" name="offered" value="${escAttr(item.purchaseId)}" ${checked ? 'checked' : ''}><span>${escAttr(item.character.name)}<small>${escAttr(item.product.series)} · ${escAttr(item.character.rarity)} · Qty ${item.item.qty}</small></span><b>${peso(item.product.price)}</b></label>`;
   }).join('') : `<p class="trade-empty-inline">Your Collection has no individually identified figures to offer yet. Add a revealed Box Pull figure to your Collection first.</p>`;
-  const previewButton = entry.product.modelPreview
+  const previewButton = entry.product.modelPreview && hasCharacterModel(entry.character.name)
     ? `<button type="button" class="btn btn-outline btn-sm" data-proposal-model>See 3D Model</button>`
     : '';
   openModal(`<div class="trade-proposal">
@@ -1138,7 +1235,7 @@ function renderTradeProposalModal(listingId, restoredState={}){
   if(modelButton){
     modelButton.addEventListener('click', ()=>{
       const state = tradeOfferFormState(document.getElementById('modalBody'));
-      renderModelViewer(entry.product, entry.character.id, entry.character.name, entry.character, {type:'trade-proposal', listingId, formState:state});
+      renderModelViewer(entry.product, entry.character.name, entry.character, {type:'trade-proposal', listingId, formState:state});
     });
   }
   form.addEventListener('submit', event=>{
@@ -1208,6 +1305,7 @@ function transferTradeDealToCollection(deal){
     purchaseId:transferId,
     kind:'character',
     name:target.character.name,
+    characterName:target.character.name,
     productName:target.product.name,
     seriesName:target.product.series,
     qty:1,
@@ -1349,20 +1447,85 @@ document.addEventListener('DOMContentLoaded', ()=>{
     const checkoutForm = document.getElementById('checkoutForm');
     const checkoutOfferWarning = document.getElementById('checkoutOfferWarning');
     const submitButton = checkoutForm.querySelector('[type="submit"]');
+    const regionSelect = document.getElementById('checkoutRegion');
+    const mobileInput = document.getElementById('checkoutMobile');
+    const mobileError = document.getElementById('checkoutMobileError');
+
+    const selectedPayment = getSelectedPayment();
+    if(selectedPayment){
+      const selectedRadio = Array.from(checkoutForm.querySelectorAll('input[name="payment"]'))
+        .find(radio=>radio.value === selectedPayment);
+      if(selectedRadio) selectedRadio.checked = true;
+    }
+
+    checkoutForm.querySelectorAll('input[name="payment"]').forEach(radio=>{
+      radio.addEventListener('change', ()=>setSelectedPayment(radio.value));
+    });
+
+    function validateMobile(){
+      const normalized = mobileInput.value.trim();
+      const valid = /^09\d{9}$/.test(normalized) || /^09\d{2} \d{3} \d{4}$/.test(normalized);
+      mobileInput.setAttribute('aria-invalid', String(!valid));
+      mobileError.textContent = valid ? '' : 'Enter a Philippine mobile number in 09XX XXX XXXX format.';
+      return valid;
+    }
+    mobileInput.addEventListener('input', ()=>{
+      if(mobileInput.value) validateMobile();
+      else{
+        mobileInput.removeAttribute('aria-invalid');
+        mobileError.textContent = '';
+      }
+    });
+
+    regionSelect.addEventListener('change', renderCheckoutSummary);
+
     function renderCheckoutSummary(){
       const itemCount = cartItemCount();
       const subtotal = cartTotal();
       const discount = itemCount >= BUNDLE_DISCOUNT_THRESHOLD ? Math.round(subtotal * BUNDLE_DISCOUNT_RATE) : 0;
       const expiredPulls = cart.filter(isPullOfferExpired);
+      const shipping = SHIPPING_RATES[regionSelect.value] ?? SHIPPING_RATES.metro;
       checkoutLayout.hidden = itemCount === 0;
       checkoutEmpty.hidden = itemCount !== 0;
       checkoutItems.innerHTML = cart.map(item=>`
         <div class="checkout-item">
           <div class="checkout-item-image">${item.image ? `<img src="${escAttr(item.image)}" alt="${escAttr(item.name)}" onerror="imgFallback(this)">` : '<span>🎁</span>'}</div>
-          <div class="checkout-item-info"><b>${escAttr(item.name)}</b><span>${item.isBoxPull ? `${escAttr(item.seriesName)} · ${escAttr(item.rarity)} · Revealed Box Pull reservation<br>` : ''}${peso(item.price)} × ${item.qty}${isPullOfferExpired(item) ? ' · Offer expired' : ''}</span></div>
+          <div class="checkout-item-info">
+            <b>${escAttr(item.name)}</b>
+            <span class="item-type-subtitle">${item.isBoxPull ? `Box Pull Reveal · ${escAttr(item.seriesName || 'Unboxed Character')}` : 'Sealed Blind Box'}</span>
+            <span>${peso(item.price)} each${isPullOfferExpired(item) ? ' · Offer expired' : ''}</span>
+          </div>
+          ${item.isBoxPull
+            ? '<span class="box-pull-lock">Box Pull Reveal · 1 reserved</span>'
+            : `<div class="checkout-stepper" aria-label="Quantity for ${escAttr(item.name)}">
+                <button type="button" data-checkout-minus="${escAttr(item.id)}" aria-label="Decrease quantity">−</button>
+                <strong>${item.qty}</strong>
+                <button type="button" data-checkout-plus="${escAttr(item.id)}" aria-label="Increase quantity">+</button>
+              </div>`}
           <strong>${peso(item.price * item.qty)}</strong>
           ${isPullOfferExpired(item) ? `<button class="cart-remove" type="button" data-checkout-remove="${escAttr(item.id)}">Remove</button>` : ''}
         </div>`).join('');
+      checkoutItems.querySelectorAll('[data-checkout-minus]').forEach(button=>{
+        button.addEventListener('click', ()=>{
+          const line = cart.find(item=>item.id === button.dataset.checkoutMinus);
+          if(!line || line.isBoxPull) return;
+          line.qty--;
+          if(line.qty < 1) cart = cart.filter(item=>item.id !== line.id);
+          saveCart();
+          updateCartBadge();
+          renderCheckoutSummary();
+        });
+      });
+      checkoutItems.querySelectorAll('[data-checkout-plus]').forEach(button=>{
+        button.addEventListener('click', ()=>{
+          const line = cart.find(item=>item.id === button.dataset.checkoutPlus);
+          if(!line || line.isBoxPull) return;
+          line.qty++;
+          saveCart();
+          updateCartBadge();
+          renderCheckoutSummary();
+        });
+      });
       checkoutItems.querySelectorAll('[data-checkout-remove]').forEach(button=>{
         button.addEventListener('click', ()=>{
           cart = cart.filter(item=>item.id !== button.dataset.checkoutRemove);
@@ -1379,7 +1542,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
       document.getElementById('checkoutItemCount').textContent = `${itemCount} item${itemCount === 1 ? '' : 's'}`;
       document.getElementById('checkoutSubtotal').textContent = peso(subtotal);
       document.getElementById('checkoutDiscount').textContent = discount ? `−${peso(discount)}` : peso(0);
-      document.getElementById('checkoutTotal').textContent = peso(subtotal - discount);
+      document.getElementById('checkoutShipping').textContent = shipping === 0 ? '₱0 (Free)' : peso(shipping);
+      document.getElementById('checkoutTotal').textContent = peso(subtotal - discount + shipping);
       const discountMessage = document.getElementById('discountMessage');
       discountMessage.textContent = itemCount >= BUNDLE_DISCOUNT_THRESHOLD
         ? '10% bundle discount applied!'
@@ -1391,19 +1555,49 @@ document.addEventListener('DOMContentLoaded', ()=>{
     checkoutForm.addEventListener('submit', event=>{
       event.preventDefault();
       if(!checkoutForm.reportValidity() || cartItemCount() === 0) return;
+      if(!validateMobile()) return;
       if(cart.some(isPullOfferExpired)){
         renderCheckoutSummary();
         return;
       }
       const purchasedLines = cart.map(item=>({...item}));
       if(!addPurchasedItemsToCollection(purchasedLines)) return;
-      const orderId = 'JT-' + Math.floor(10000 + Math.random()*89999);
+      const itemCount = cartItemCount();
+      const subtotal = cartTotal();
+      const discount = itemCount >= BUNDLE_DISCOUNT_THRESHOLD ? Math.round(subtotal * BUNDLE_DISCOUNT_RATE) : 0;
+      const shipping = SHIPPING_RATES[regionSelect.value] ?? SHIPPING_RATES.metro;
+      const payment = checkoutForm.querySelector('input[name="payment"]:checked')?.value || getSelectedPayment();
+      const orderId = `#JT-2026-${String(Math.floor(1000 + Math.random()*9000)).padStart(4,'0')}`;
+      const deliveryAddress = document.getElementById('checkoutAddress').value.trim();
+      const note = document.getElementById('checkoutNote').value.trim();
+      const name = document.getElementById('checkoutName').value.trim();
+      const email = document.getElementById('checkoutEmail').value.trim();
+      const mobile = mobileInput.value.trim();
+      const receiptLines = purchasedLines.map(item=>`
+        <div class="receipt-line">
+          <span><strong>${escAttr(item.name)}</strong><small>${item.isBoxPull ? `Box Pull Reveal · ${escAttr(item.seriesName || '')}` : 'Sealed Blind Box'} · Qty ${item.qty}</small></span>
+          <strong>${peso(item.price * item.qty)}</strong>
+        </div>`).join('');
       cart = [];
       saveCart();
       updateCartBadge();
       checkoutLayout.hidden = true;
       orderConfirmation.hidden = false;
-      document.getElementById('orderNumber').textContent = orderId;
+      document.getElementById('orderReceipt').innerHTML = `
+        <div class="receipt-header"><span class="kicker">Order Confirmed</span><h2>Thank you, ${escAttr(name)}!</h2><strong>${orderId}</strong></div>
+        <div class="receipt-section"><h3>Items</h3>${receiptLines}</div>
+        <div class="receipt-section receipt-totals">
+          <div><span>Subtotal</span><strong>${peso(subtotal)}</strong></div>
+          <div><span>Bundle discount</span><strong>${discount ? `−${peso(discount)}` : peso(0)}</strong></div>
+          <div><span>Shipping · ${escAttr(SHIPPING_LABELS[regionSelect.value])}</span><strong>${shipping === 0 ? '₱0 (Free)' : peso(shipping)}</strong></div>
+          <div class="receipt-grand-total"><span>Grand total</span><strong>${peso(subtotal - discount + shipping)}</strong></div>
+        </div>
+        <div class="receipt-section receipt-details">
+          <p><strong>Payment</strong><span>${escAttr(payment)}</span></p>
+          <p><strong>Deliver to</strong><span>${escAttr(name)} · ${escAttr(mobile)}<br>${escAttr(deliveryAddress)}</span></p>
+          <p><strong>Email</strong><span>${escAttr(email)}</span></p>
+          ${note ? `<p><strong>Packaging note</strong><span>${escAttr(note)}</span></p>` : ''}
+        </div>`;
     });
   }
 
@@ -1647,7 +1841,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
             ? `${pullOdds} pool odds. This is a revealed in-store figure, not a purchase until checkout.`
             : 'This older pull is no longer available to reserve.'}</p>
           ${product ? `<p class="pull-result-price">${peso(poolItem.price)}</p>` : ''}
-          ${product && product.modelPreview ? '<button class="btn btn-outline" id="previewPulledFigure" type="button">See 3D Model</button>' : ''}
+          ${product && product.modelPreview && hasCharacterModel(character.name) ? '<button class="btn btn-outline" id="previewPulledFigure" type="button">See 3D Model</button>' : ''}
           ${product ? `
             <p class="vault-offer-countdown" id="vaultOfferCountdown" role="status"></p>
             <button class="btn btn-primary" id="addPulledFigure" style="margin-top:12px;" ${offerExpired || pullResult.addedToCart ? 'disabled' : ''}>
@@ -1656,7 +1850,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
         const addButton = result.querySelector('#addPulledFigure');
         const previewButton = result.querySelector('#previewPulledFigure');
         if(previewButton){
-          previewButton.addEventListener('click', ()=>renderModelViewer(product, character.id, character.name, character));
+          previewButton.addEventListener('click', ()=>renderModelViewer(product, character.name, character));
         }
         const countdown = result.querySelector('#vaultOfferCountdown');
         if(product && countdown){
@@ -1781,15 +1975,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
       if(owned){
         slot.style.padding = '0';
         slot.style.overflow = 'hidden';
-        slot.innerHTML = `${placeholderBox(p.name, p.image)}${p.modelPreview === false ? '' : `<button type="button" class="shelf-model-button" aria-label="See 3D model of ${escAttr(p.name)}">See 3D Model</button>`}`;
+        slot.innerHTML = `${placeholderBox(p.name, p.image)}<span class="shelf-model-status">Sealed Series Box</span>`;
         slot.style.position = 'relative';
-        const modelButton = slot.querySelector('.shelf-model-button');
-        if(modelButton){
-          modelButton.addEventListener('click', event=>{
-            event.stopPropagation();
-            renderModelViewer(p, '', p.name);
-          });
-        }
         const quantity = document.createElement('span');
         quantity.className = 'shelf-quantity';
         quantity.textContent = `×${productItems.reduce((total,item)=>total + (Number(item.qty) || 0), 0)}`;
@@ -1805,24 +1992,26 @@ document.addEventListener('DOMContentLoaded', ()=>{
     });
     collection.filter(item=> item.kind === 'character' && item.qty > 0).forEach(item=>{
       const product = PRODUCTS.find(entry=> entry.name === item.productName);
-      const character = product && product.characters.find(entry=> entry.id === item.characterId);
+      const characterName = item.characterName || item.name;
+      const character = product && product.characters.find(entry=>entry.name === characterName);
+      const canPreview = Boolean(product && character && product.modelPreview && hasCharacterModel(character.name));
       const slot = document.createElement('div');
       slot.className = 'shelf-slot filled shelf-character-slot';
-      slot.title = `${item.name} · ${item.seriesName} · ${item.rarity} · Qty: ${item.qty}`;
+      slot.title = `${characterName} · ${item.seriesName} · ${item.rarity} · Qty: ${item.qty}`;
       slot.setAttribute('aria-label', slot.title);
       slot.style.position = 'relative';
       slot.style.padding = '0';
       slot.style.overflow = 'hidden';
-      slot.innerHTML = `${placeholderBox(item.name, item.image)}
-        <div class="shelf-character-meta"><b>${escAttr(item.name)}</b><span>${escAttr(item.seriesName)}</span></div>
+      slot.innerHTML = `${placeholderBox(characterName, item.image)}
+        <div class="shelf-character-meta"><b>${escAttr(characterName)}</b><span>${escAttr(item.seriesName)}</span></div>
         <span class="shelf-character-rarity ${item.rarity === 'Secret Chase' ? 'rarity-secret' : 'rarity-common'}">${escAttr(item.rarity)}</span>
-        ${product && product.modelPreview && character ? `<button type="button" class="shelf-model-button" aria-label="See 3D model of ${escAttr(item.name)}">See 3D Model</button>` : ''}
+        ${canPreview ? `<button type="button" class="shelf-model-button" aria-label="See 3D model of ${escAttr(characterName)}">See 3D Model</button>` : '<span class="shelf-model-status">3D Preview Unavailable</span>'}
         <span class="shelf-quantity">×${item.qty}</span>`;
       const modelButton = slot.querySelector('.shelf-model-button');
       if(modelButton){
         modelButton.addEventListener('click', event=>{
           event.stopPropagation();
-          renderModelViewer(product, character.id, character.name, character);
+          renderModelViewer(product, character.name, character);
         });
       }
       shelfRow.appendChild(slot);

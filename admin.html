@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/jpeg" href="https://imgur.com/QQU8ro6.jpeg">
+<title>Store Admin — Joy Trinkets</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js",
+    "@mkkellogg/gaussian-splats-3d": "https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"
+  }
+}
+</script>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <nav>
+      <a class="logo" href="index.html"><img class="logo-image" src="https://imgur.com/QQU8ro6.jpeg" alt="Joy Trinkets"></a>
+      <div class="nav-links" id="primaryNav">
+        <a href="categories.html">Categories</a><a href="drops.html">Drops</a><a href="pull.html">Box Pull</a><a href="shelf.html">Collection</a><a href="trade.html">Trade</a><a class="admin-nav-link" href="admin.html" hidden>Admin</a>
+      </div>
+      <button class="nav-toggle" type="button" data-nav-toggle aria-controls="primaryNav" aria-expanded="false" aria-label="Open navigation"><span class="nav-toggle-lines" aria-hidden="true"></span></button>
+      <div class="nav-right">
+        <button class="btn btn-outline btn-sm" data-modal="signin">Sign in</button>
+        <div class="notification-wrap">
+          <button class="icon-btn notification-bell" type="button" aria-label="Notifications" aria-expanded="false" aria-controls="notificationDropdown" data-notification-toggle>🔔<span class="badge-count" data-notification-count hidden>0</span></button>
+          <div class="notification-dropdown" id="notificationDropdown" hidden><div class="notification-heading"><b>Notifications &amp; Approvals</b><button type="button" data-notification-read-all>Mark all read</button></div><div class="notification-list" data-notification-list></div></div>
+        </div>
+        <button class="icon-btn" data-modal="cart" aria-label="Open cart">🛍<span class="badge-count" id="cartCount">0</span></button>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<main class="page-section admin-page">
+  <div class="wrap">
+    <section class="admin-access-card" id="adminAccessRequired" hidden>
+      <div class="icon-badge">🔒</div>
+      <h1>Admin Access Required</h1>
+      <p>Sign in with the Store Admin account to access store management tools.</p>
+      <button class="btn btn-primary" type="button" data-modal="signin">Sign in as Store Admin</button>
+    </section>
+
+    <div id="adminDashboard" hidden>
+      <div class="admin-page-heading"><span class="kicker">Joy Trinkets · Store Admin</span><h1>Store dashboard</h1><p>Manage checkout orders, catalog availability, marketplace listings, and in-store escrow reviews.</p></div>
+      <section class="admin-kpis" aria-label="Store summary">
+        <article class="admin-kpi"><span>Total Store Sales</span><strong id="adminSales">₱0</strong><small id="adminOrderCount">0 orders</small></article>
+        <article class="admin-kpi"><span>Active Escrow &amp; Legit Checks</span><strong id="adminEscrowCount">0</strong><small>Awaiting store verification</small></article>
+        <article class="admin-kpi"><span>Live Marketplace Listings</span><strong id="adminListingCount">0</strong><small>Community and collector listings</small></article>
+        <article class="admin-kpi"><span>Catalog Series &amp; Figures</span><strong id="adminCatalogCount">0</strong><small id="adminFigureCount">0 figures</small></article>
+      </section>
+      <section class="admin-management">
+        <div class="admin-tabs" role="tablist" aria-label="Store management">
+          <button class="admin-tab active" type="button" role="tab" aria-selected="true" data-admin-tab="escrow">Legit Check &amp; Escrow</button>
+          <button class="admin-tab" type="button" role="tab" aria-selected="false" data-admin-tab="orders">Orders &amp; Fulfillments</button>
+          <button class="admin-tab" type="button" role="tab" aria-selected="false" data-admin-tab="catalog">Catalog &amp; Pricing</button>
+          <button class="admin-tab" type="button" role="tab" aria-selected="false" data-admin-tab="moderation">Marketplace Moderation</button>
+        </div>
+        <section class="admin-panel" data-admin-panel="escrow" role="tabpanel"><div class="admin-panel-heading"><h2>Legit Check &amp; Escrow Queue</h2><p>Active offers that have been approved and locked into escrow across collector accounts.</p></div><div id="adminEscrowQueue" class="admin-record-list"></div></section>
+        <section class="admin-panel" data-admin-panel="orders" role="tabpanel" hidden><div class="admin-panel-heading"><h2>Orders &amp; Fulfillments</h2><p>Checkout orders, including exact characters revealed and reserved through Box Pull.</p></div><div id="adminOrders" class="admin-record-list"></div></section>
+        <section class="admin-panel" data-admin-panel="catalog" role="tabpanel" hidden><div class="admin-panel-heading"><h2>Catalog &amp; Pricing Manager</h2><p>Price and stock overrides apply to the storefront catalog across accounts.</p></div><form id="adminAddCatalogForm" class="admin-add-catalog"><h3>Add a new figure / drop</h3><div class="admin-form-grid"><label>Drop / series name<input name="seriesName" required></label><label>Figure name<input name="figureName" required></label><label>Retail price (₱)<input name="price" type="number" min="1" step="1" required></label><label>Category<input name="category" value="admin"></label><label>Image URL<input name="image" type="url" placeholder="https://…"></label></div><button class="btn btn-primary btn-sm" type="submit">Add to catalog</button></form><div id="adminCatalog" class="admin-record-list"></div></section>
+        <section class="admin-panel" data-admin-panel="moderation" role="tabpanel" hidden><div class="admin-panel-heading"><h2>Marketplace Moderation</h2><p>Review live community and collector listings and remove listings that should no longer appear.</p></div><div id="adminModeration" class="admin-record-list"></div></section>
+      </section>
+    </div>
+  </div>
+</main>
+<footer><div class="wrap"><div class="footer-bottom"><span>© 2026 Joy Trinkets. Store Admin demo dashboard.</span><a href="index.html">Back to storefront</a></div></div></footer>
+<div class="modal-overlay" id="modalOverlay"><div class="modal-box"><button class="modal-close" id="modalClose">×</button><div id="modalBody"></div></div></div>
+<div class="toast" id="toast"></div>
+<script type="module" src="script.js"></script>
+</body>
+</html>

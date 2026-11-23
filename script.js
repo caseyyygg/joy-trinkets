@@ -10,6 +10,9 @@ import * as GaussianSplats3D from '@mkkellogg/gaussian-splats-3d';
 const peso = n => '₱' + n.toLocaleString('en-PH');
 const NOTIFICATIONS_STORAGE_KEY = 'joytrinkets_notifications';
 const TRADE_OFFERS_STORAGE_KEY = 'joytrinkets_trade_offers';
+const CATALOG_OVERRIDES_STORAGE_KEY = 'joyTrinkets_catalogOverrides';
+const STORE_ADMIN_EMAIL = 'admin@joytrinkets.com';
+const STORE_ADMIN_PASSWORD = 'Admin123!';
 const MODEL_VIEWER_SETTINGS = {
   cameraUp:[0, 1, 0],
   cameraPosition:[0, 0, 1.8],
@@ -76,6 +79,10 @@ function hasCharacterModel(name){
 function accountStorageKey(namespace, accountId=getSignedInEmail()){
   const normalizedId = String(accountId || '').trim().toLowerCase();
   return `${namespace}_${normalizedId ? encodeURIComponent(normalizedId) : 'guest'}`;
+}
+
+function isStoreAdmin(){
+  return getSignedInEmail().trim().toLowerCase() === STORE_ADMIN_EMAIL;
 }
 
 function characterModelData(name, modelUrl='', modelOrientation={}){
@@ -147,6 +154,31 @@ function addNotification(message, {href='trade.html', target='offers', toastMess
   }
   renderNotifications();
   if(toastMessage) toast(toastMessage);
+}
+
+function addAccountNotification(accountId, message, {href='trade.html', target='offers'}={}){
+  if(!accountId) return;
+  const key = accountStorageKey(NOTIFICATIONS_STORAGE_KEY, accountId);
+  let notifications = [];
+  try{
+    const stored = JSON.parse(localStorage.getItem(key) || '[]');
+    if(Array.isArray(stored)) notifications = stored;
+  }catch(error){
+    console.error('Could not read the recipient notifications.', error);
+  }
+  notifications.unshift({
+    id:createLocalId('notification'),
+    message,
+    href,
+    target,
+    read:false,
+    createdAt:Date.now(),
+  });
+  try{
+    localStorage.setItem(key, JSON.stringify(notifications.slice(0, 60)));
+  }catch(error){
+    console.error('Could not save the recipient notification.', error);
+  }
 }
 
 function markNotificationsRead(){
@@ -416,6 +448,63 @@ const PRODUCTS = [
   ]}),
 ];
 
+function applyCatalogOverrides(){
+  try{
+    const raw = localStorage.getItem(CATALOG_OVERRIDES_STORAGE_KEY);
+    if(!raw) return;
+    const overrides = JSON.parse(raw);
+    if(!overrides || typeof overrides !== 'object' || Array.isArray(overrides)) throw new Error('Catalog overrides are not an object.');
+    for(const product of overrides.products || []){
+      if(!product || typeof product.name !== 'string' || !Array.isArray(product.characters)) continue;
+      const existing = PRODUCTS.find(item=>item.name === product.name);
+      if(existing){
+        if(Number.isFinite(Number(product.price)) && Number(product.price) > 0) existing.price = Number(product.price);
+        if(['tag-new', 'tag-low', 'tag-soldout'].includes(product.tag)){
+          existing.tag = product.tag;
+          existing.tagText = product.tagText || (product.tag === 'tag-soldout' ? 'Sold out' : product.tag === 'tag-low' ? 'Low stock' : 'In stock');
+        }
+        for(const character of product.characters){
+          if(!character || typeof character.name !== 'string') continue;
+          const current = existing.characters.find(item=>item.id === character.id || item.name === character.name);
+          if(current && character.image) current.image = character.image;
+          if(!current){
+            existing.characters.push({
+              name:character.name,
+              rarity:character.rarity || 'Standard',
+              odds:character.odds || '1/12',
+              image:character.image || '',
+              ...characterModelData(character.name),
+            });
+          }
+        }
+      }else{
+        const created = makeSeries({
+          name:product.name,
+          category:product.category || 'admin',
+          series:product.series || product.name,
+          price:Number(product.price) > 0 ? Number(product.price) : 1,
+          tag:product.tag || 'tag-new',
+          tagText:product.tagText || 'In stock',
+          heightCm:Number(product.heightCm) || 8,
+          image:product.image || '',
+          chase:product.chase || '',
+          characters:product.characters.map(character=>({
+            name:character.name,
+            rarity:character.rarity || 'Standard',
+            odds:character.odds || '1/12',
+            image:character.image || '',
+          })),
+          modelPreview:false,
+        });
+        PRODUCTS.push(created);
+      }
+    }
+  }catch(error){
+    console.error('Could not apply catalog overrides.', error);
+  }
+}
+applyCatalogOverrides();
+
 const PULL_POOL_VERSION = 3;
 const PULL_OFFER_DURATION = 30 * 60 * 1000;
 const AVAILABLE_PULL_POOL = PRODUCTS
@@ -576,6 +665,7 @@ function updateSignInButton(){
     button.textContent = signedInEmail ? 'Sign out' : 'Sign in';
     button.setAttribute('aria-label', signedInEmail ? `Sign out ${signedInEmail}` : 'Sign in');
   });
+  document.querySelectorAll('.admin-nav-link').forEach(link=>{link.hidden = !isStoreAdmin();});
 }
 
 function loadCollection(){
@@ -998,31 +1088,41 @@ function renderCartModal(){
 function renderSignInModal(){
   openModal(`
     <h3>Sign in</h3>
-    <p class="modal-sub">Demo sign-in — any valid email and password unlocks this feature in this browser.</p>
+    <p class="modal-sub">Sign in to access your personal collection and account features.</p>
     <form id="signInForm">
       <div class="form-field"><label for="signInEmail">Email</label><input id="signInEmail" name="email" type="email" autocomplete="email" placeholder="you@email.com" required></div>
       <div class="form-field"><label for="signInPassword">Password</label><input id="signInPassword" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required></div>
       <button class="btn btn-primary" type="submit" style="width:100%; justify-content:center;">Log in</button>
     </form>
+    <button class="btn btn-outline" type="button" id="storeAdminDemo" style="width:100%;justify-content:center;margin-top:10px;">Sign in as Store Admin (Demo)</button>
     <p style="text-align:center; font-size:13px; color:var(--muted); margin-top:14px;">No account? <button style="background:none;border:none;color:var(--coral); text-decoration:underline; font-size:13px;" id="signupLink">Sign up</button></p>`);
   const body = document.getElementById('modalBody');
+  const signIn = (email, password)=>{
+    const normalizedEmail = email.trim().toLowerCase();
+    if(normalizedEmail === STORE_ADMIN_EMAIL && password !== STORE_ADMIN_PASSWORD){
+      toast('The Store Admin password is incorrect');
+      return;
+    }
+    try{
+      localStorage.setItem('joytrinkets_user', normalizedEmail);
+    }catch(error){
+      console.error('Could not save the sign-in state.', error);
+      toast('Sign in could not be saved in this browser');
+      return false;
+    }
+    closeModal();
+    updateSignInButton();
+    toast(isStoreAdmin() ? 'Signed in as Store Admin' : 'Signed in (demo)');
+    location.reload();
+    return true;
+  };
   body.querySelector('#signInForm').addEventListener('submit', event=>{
     event.preventDefault();
     const form = event.currentTarget;
     if(!form.reportValidity()) return;
-    const email = body.querySelector('#signInEmail').value.trim();
-    try{
-      localStorage.setItem('joytrinkets_user', email);
-    }catch(error){
-      console.error('Could not save the sign-in state.', error);
-      toast('Sign in could not be saved in this browser');
-      return;
-    }
-    closeModal();
-    updateSignInButton();
-    toast('Signed in (demo)');
-    location.reload();
+    signIn(body.querySelector('#signInEmail').value, body.querySelector('#signInPassword').value);
   });
+  body.querySelector('#storeAdminDemo').addEventListener('click', ()=>signIn(STORE_ADMIN_EMAIL, STORE_ADMIN_PASSWORD));
   body.querySelector('#signupLink').addEventListener('click', ()=> toast('Sign-up flow coming soon'));
 }
 
@@ -1797,11 +1897,12 @@ function renderTradeProposalModal(listingId, restoredState={}){
   });
 }
 
-function transferTradeDealToCollection(deal){
+function transferTradeDealToCollection(deal, accountId=getSignedInEmail()){
   const transferId = `trade-${deal.id}`;
   let collection;
+  const collectionKey = accountStorageKey('joyTrinkets_collection', accountId);
   try{
-    const raw = localStorage.getItem(accountStorageKey('joyTrinkets_collection'));
+    const raw = localStorage.getItem(collectionKey);
     const stored = raw ? JSON.parse(raw) : [];
     if(!Array.isArray(stored)) throw new Error('Saved collection data is not a list.');
     collection = stored;
@@ -1857,7 +1958,15 @@ function transferTradeDealToCollection(deal){
       modelOrientation:target.character.modelOrientation || null,
     });
   }
-  return saveCollection(remaining);
+  if(String(accountId).trim().toLowerCase() === getSignedInEmail().trim().toLowerCase()) return saveCollection(remaining);
+  try{
+    localStorage.setItem(collectionKey, JSON.stringify(remaining));
+    return true;
+  }catch(error){
+    console.error('Could not save the recipient Collection for trade completion.', error);
+    toast('The recipient Collection could not be updated');
+    return false;
+  }
 }
 
 function renderTradeDeals(){
@@ -1927,10 +2036,323 @@ function renderInfoModal(key){
   document.getElementById('modalBody').querySelector('#infoClose').addEventListener('click', closeModal);
 }
 
+function getLocalStorageKeys(prefix){
+  const keys = [];
+  try{
+    for(let index=0;index<localStorage.length;index++){
+      const key = localStorage.key(index);
+      if(key && key.startsWith(prefix)) keys.push(key);
+    }
+  }catch(error){
+    console.error('Could not inspect local Store Admin data.', error);
+  }
+  return keys;
+}
+
+function accountFromScopedKey(key, prefix){
+  try{
+    return decodeURIComponent(key.slice(prefix.length)).toLowerCase();
+  }catch(error){
+    console.error('Could not identify the account for a Store Admin record.', error);
+    return '';
+  }
+}
+
+function readScopedRecords(prefix){
+  return getLocalStorageKeys(`${prefix}_`).flatMap(key=>{
+    try{
+      const records = JSON.parse(localStorage.getItem(key) || '[]');
+      if(!Array.isArray(records)) throw new Error('Stored records are not a list.');
+      return records.map(record=>({record, key, accountId:accountFromScopedKey(key, `${prefix}_`)}));
+    }catch(error){
+      console.error(`Could not read Store Admin records in ${key}.`, error);
+      return [];
+    }
+  });
+}
+
+function saveScopedRecords(key, records){
+  try{
+    localStorage.setItem(key, JSON.stringify(records));
+    return true;
+  }catch(error){
+    console.error(`Could not save Store Admin records in ${key}.`, error);
+    toast('The store record could not be saved');
+    return false;
+  }
+}
+
+function loadCatalogOverrides(){
+  try{
+    const stored = JSON.parse(localStorage.getItem(CATALOG_OVERRIDES_STORAGE_KEY) || '{"products":[]}');
+    return stored && Array.isArray(stored.products) ? stored : {products:[]};
+  }catch(error){
+    console.error('Could not read catalog overrides.', error);
+    return {products:[]};
+  }
+}
+
+function initAdminDashboard(){
+  const dashboard = document.getElementById('adminDashboard');
+  if(!dashboard) return;
+  const accessRequired = document.getElementById('adminAccessRequired');
+  const authorized = isStoreAdmin();
+  dashboard.hidden = !authorized;
+  accessRequired.hidden = authorized;
+  if(!authorized) return;
+
+  const moderationKey = 'joyTrinkets_moderatedListings';
+  const renderAdminEscrow = ()=>{
+    const rows = readScopedRecords(TRADE_DEALS_STORAGE_KEY).filter(({record})=>
+      record && record.id && record.status !== 'rejected' && Number(record.stage) < 5
+    );
+    const host = document.getElementById('adminEscrowQueue');
+    host.innerHTML = rows.length ? rows.map(({record:deal,accountId})=>{
+      const item = tradeCharacter(deal.productName, deal.characterId);
+      const label = item ? `${item.character.name} · ${item.product.series}` : deal.productName;
+      const stage = Math.max(0, Math.min(5, Number(deal.stage) || 0));
+      return `<article class="admin-record">
+        <div class="admin-record-copy"><span class="kicker">${escAttr(accountId || 'Collector')} · ${escAttr(deal.waybill || 'Escrow')}</span><h3>${escAttr(label)}</h3><p>${stage === 0 ? 'Escrow locked; awaiting drop-off' : TRADE_STAGES[Math.min(stage - 1, TRADE_STAGES.length - 1)]} · Asking ${peso(Number(deal.askingPrice) || (item && item.product.price) || 0)}</p><small>${(deal.offered || []).map(entry=>escAttr(entry.productName)).join(', ') || 'Cash / sale offer'}</small></div>
+        <div class="admin-record-actions"><button class="btn btn-primary btn-sm" type="button" data-admin-deal="advance" data-account="${escAttr(accountId)}" data-deal="${escAttr(deal.id)}">Approve Legit Check &amp; Advance Stage</button><button class="btn btn-outline btn-sm" type="button" data-admin-deal="reject" data-account="${escAttr(accountId)}" data-deal="${escAttr(deal.id)}">Flag / Reject Item (Refund Escrow)</button><button class="btn btn-outline btn-sm" type="button" data-admin-deal="complete" data-account="${escAttr(accountId)}" data-deal="${escAttr(deal.id)}">Mark Deal Completed</button></div>
+      </article>`;
+    }).join('') : '<p class="admin-empty">No active escrow deals are waiting for review.</p>';
+    host.querySelectorAll('[data-admin-deal]').forEach(button=>button.addEventListener('click', ()=>{
+      const action = button.dataset.adminDeal;
+      const key = accountStorageKey(TRADE_DEALS_STORAGE_KEY, button.dataset.account);
+      let deals;
+      try{
+        const stored = JSON.parse(localStorage.getItem(key) || '[]');
+        deals = Array.isArray(stored) ? stored : [];
+      }catch(error){
+        console.error('Could not load the deal for Store Admin action.', error);
+        toast('The escrow deal could not be loaded');
+        return;
+      }
+      const deal = deals.find(entry=>entry.id === button.dataset.deal);
+      if(!deal) return;
+      let message;
+      if(action === 'reject'){
+        deal.status = 'rejected';
+        deal.rejectionReason = 'Flagged by Store Admin';
+        message = 'Joy Trinkets flagged the item and released your escrow hold.';
+        const listingKey = accountStorageKey(TRADE_LISTINGS_STORAGE_KEY, button.dataset.account);
+        try{
+          const listings = JSON.parse(localStorage.getItem(listingKey) || '[]');
+          if(Array.isArray(listings)){
+            listings.forEach(listing=>{if(listing.id === deal.listingId) delete listing.lockedDealId;});
+            localStorage.setItem(listingKey, JSON.stringify(listings));
+          }
+        }catch(error){
+          console.error('Could not release the moderated listing.', error);
+        }
+      }else if(action === 'complete'){
+        if(!transferTradeDealToCollection(deal, button.dataset.account)) return;
+        deal.stage = 5;
+        deal.status = 'completed';
+        message = 'Your trade is complete. Your Collection has been updated.';
+      }else{
+        if(Number(deal.stage) < 2) deal.stage = 3;
+        else deal.stage = Math.min(5, Number(deal.stage) + 1);
+        if(deal.stage >= 5){
+          if(!transferTradeDealToCollection(deal, button.dataset.account)) return;
+          deal.status = 'completed';
+          message = 'Your deal passed the final Legit Check stage and your Collection was updated.';
+        }else{
+          message = 'Joy Trinkets approved the Legit Check and advanced your escrow deal.';
+        }
+      }
+      if(!saveScopedRecords(key, deals)) return;
+      addAccountNotification(button.dataset.account, message, {target:`deals-${deal.id}`});
+      renderAdminDashboard();
+      toast('Escrow record updated');
+    }));
+  };
+
+  const renderAdminOrders = ()=>{
+    const orders = readScopedRecords('joyTrinkets_orders').sort((a,b)=>Number(b.record.createdAt)-Number(a.record.createdAt));
+    const host = document.getElementById('adminOrders');
+    host.innerHTML = orders.length ? orders.map(({record:order,key,accountId})=>`<article class="admin-record">
+      <div class="admin-record-copy"><span class="kicker">${escAttr(order.id)} · ${escAttr(accountId)}</span><h3>${escAttr(order.customerName || 'Customer')} · ${peso(Number(order.total) || 0)}</h3><p>${escAttr(order.customerEmail || '')} · ${escAttr(order.payment || 'Payment not recorded')} · ${new Date(Number(order.createdAt) || Date.now()).toLocaleString()}</p><small>${(order.items || []).map(item=>`${escAttr(item.name)}${item.isBoxPull ? ' · Box Pull' : ''} ×${Number(item.quantity) || 1}`).join(' · ')}</small></div>
+      <label class="admin-order-status">Fulfillment status<select data-order-status data-account="${escAttr(accountId)}" data-order="${escAttr(order.id)}">${['Processing','Ready for Pickup','Shipped','Delivered'].map(status=>`<option ${order.status === status ? 'selected' : ''}>${status}</option>`).join('')}</select></label>
+    </article>`).join('') : '<p class="admin-empty">No checkout orders have been recorded yet.</p>';
+    host.querySelectorAll('[data-order-status]').forEach(select=>select.addEventListener('change', ()=>{
+      let ordersForAccount;
+      try{
+        ordersForAccount = JSON.parse(localStorage.getItem(select.dataset.account ? accountStorageKey('joyTrinkets_orders', select.dataset.account) : '') || '[]');
+      }catch(error){
+        console.error('Could not load the customer order status.', error);
+        toast('The order status could not be loaded');
+        return;
+      }
+      if(!Array.isArray(ordersForAccount)) return;
+      const order = ordersForAccount.find(item=>item.id === select.dataset.order);
+      if(!order) return;
+      order.status = select.value;
+      if(saveScopedRecords(accountStorageKey('joyTrinkets_orders', select.dataset.account), ordersForAccount)){
+        addAccountNotification(select.dataset.account, `Order ${order.id} status updated: ${order.status}.`, {href:'checkout.html', target:'orders'});
+        toast(`Order status set to ${order.status}`);
+      }
+    }));
+  };
+
+  const renderAdminCatalog = ()=>{
+    const host = document.getElementById('adminCatalog');
+    host.innerHTML = PRODUCTS.map((product,index)=>`<article class="admin-record admin-catalog-row">
+      <div class="admin-record-copy"><span class="kicker">${escAttr(product.series)} · ${product.characters.length} figures</span><h3>${escAttr(product.name)}</h3><small>${product.characters.map(character=>escAttr(character.name)).join(' · ')}</small></div>
+      <label>Retail price<input type="number" min="1" step="1" value="${Number(product.price)}" data-catalog-price="${index}"></label>
+      <label>Stock<select data-catalog-stock="${index}"><option value="tag-new" ${product.tag !== 'tag-low' && product.tag !== 'tag-soldout' ? 'selected' : ''}>In Stock</option><option value="tag-low" ${product.tag === 'tag-low' ? 'selected' : ''}>Low Stock</option><option value="tag-soldout" ${product.tag === 'tag-soldout' ? 'selected' : ''}>Sold Out</option></select></label>
+      <button class="btn btn-outline btn-sm" type="button" data-save-catalog="${index}">Save changes</button>
+    </article>`).join('');
+    host.querySelectorAll('[data-save-catalog]').forEach(button=>button.addEventListener('click', ()=>{
+      const product = PRODUCTS[Number(button.dataset.saveCatalog)];
+      const price = Number(host.querySelector(`[data-catalog-price="${button.dataset.saveCatalog}"]`).value);
+      const tag = host.querySelector(`[data-catalog-stock="${button.dataset.saveCatalog}"]`).value;
+      if(!product || !Number.isFinite(price) || price <= 0){
+        toast('Enter a valid retail price greater than ₱0');
+        return;
+      }
+      const overrides = loadCatalogOverrides();
+      const saved = overrides.products.find(item=>item.name === product.name) || {
+        name:product.name,
+        category:product.category,
+        series:product.series,
+        heightCm:product.heightCm,
+        image:product.image,
+        chase:product.chase,
+        characters:product.characters.map(character=>({id:character.id,name:character.name,rarity:character.rarity,odds:character.odds,image:character.image})),
+      };
+      saved.price = price;
+      saved.tag = tag;
+      saved.tagText = tag === 'tag-soldout' ? 'Sold out' : tag === 'tag-low' ? 'Low stock' : 'In stock';
+      if(!overrides.products.some(item=>item.name === product.name)) overrides.products.push(saved);
+      try{
+        localStorage.setItem(CATALOG_OVERRIDES_STORAGE_KEY, JSON.stringify(overrides));
+        location.reload();
+      }catch(error){
+        console.error('Could not save catalog overrides.', error);
+        toast('Catalog changes could not be saved');
+      }
+    }));
+  };
+
+  const renderAdminModeration = ()=>{
+    let removed = [];
+    try{
+      const saved = JSON.parse(localStorage.getItem(moderationKey) || '[]');
+      if(Array.isArray(saved)) removed = saved;
+    }catch(error){
+      console.error('Could not read moderated listing IDs.', error);
+    }
+    const rows = [
+      ...COMMUNITY_LISTINGS.filter(listing=>!removed.includes(listing.id)).map(listing=>({listing,accountId:'Community'})),
+      ...readScopedRecords(TRADE_LISTINGS_STORAGE_KEY).map(({record:listing,accountId})=>({listing,accountId})),
+    ].filter(({listing})=>listing && tradeCharacter(listing.productName, listing.characterId));
+    const host = document.getElementById('adminModeration');
+    host.innerHTML = rows.length ? rows.map(({listing,accountId})=>{
+      const entry = tradeCharacter(listing.productName, listing.characterId);
+      return `<article class="admin-record"><div class="admin-record-copy"><span class="kicker">${escAttr(accountId)} · ${listing.type === 'sale' ? 'For Sale' : listing.type === 'trade-or-buy' ? 'Trade or Buy' : 'For Trade'}</span><h3>${escAttr(entry.character.name)} · ${escAttr(entry.product.series)}</h3><p>${escAttr((listing.conditions || []).join(' · ') || 'Condition not specified')} · Asking ${peso(Number(listing.askPrice) || entry.product.price)}</p><small>ISO: ${(listing.isoIds || []).map(key=>MARKETPLACE_BY_KEY.get(key)?.character.name || '').filter(Boolean).map(escAttr).join(', ') || 'Open to offers'}</small></div><button class="btn btn-outline btn-sm" type="button" data-moderate-listing="${escAttr(listing.id)}" data-account="${escAttr(accountId)}">Remove Listing</button></article>`;
+    }).join('') : '<p class="admin-empty">No marketplace listings to moderate.</p>';
+    host.querySelectorAll('[data-moderate-listing]').forEach(button=>button.addEventListener('click', ()=>{
+      const id = button.dataset.moderateListing;
+      if(button.dataset.account === 'Community'){
+        if(!removed.includes(id)) removed.push(id);
+        try{localStorage.setItem(moderationKey, JSON.stringify(removed));}
+        catch(error){console.error('Could not save marketplace moderation.', error);toast('Listing could not be removed');return;}
+      }else{
+        const accountId = button.dataset.account;
+        const listingKey = accountStorageKey(TRADE_LISTINGS_STORAGE_KEY, accountId);
+        let listings;
+        try{listings = JSON.parse(localStorage.getItem(listingKey) || '[]');}
+        catch(error){console.error('Could not load moderated marketplace listings.', error);toast('Listing could not be removed');return;}
+        if(!Array.isArray(listings)) return;
+        const listing = listings.find(item=>item.id === id);
+        if(listing && listing.lockedDealId && readScopedRecords(TRADE_DEALS_STORAGE_KEY).some(({record})=>record.id === listing.lockedDealId && Number(record.stage) < 5)){
+          toast('This listing is locked in an active escrow deal');
+          return;
+        }
+        if(!saveScopedRecords(listingKey, listings.filter(item=>item.id !== id))) return;
+        addAccountNotification(accountId, 'Your marketplace listing was removed by Store Admin.', {href:'trade.html', target:'listings'});
+      }
+      renderAdminDashboard();
+      toast('Marketplace listing removed');
+    }));
+  };
+
+  const renderAdminDashboard = ()=>{
+    const orders = readScopedRecords('joyTrinkets_orders');
+    const deals = readScopedRecords(TRADE_DEALS_STORAGE_KEY).filter(({record})=>record && record.status !== 'rejected' && Number(record.stage) < 5);
+    const listings = readScopedRecords(TRADE_LISTINGS_STORAGE_KEY);
+    let removed = [];
+    try{
+      const saved = JSON.parse(localStorage.getItem(moderationKey) || '[]');
+      if(Array.isArray(saved)) removed = saved;
+    }catch(error){ console.error('Could not read marketplace moderation.', error); }
+    document.getElementById('adminSales').textContent = peso(orders.reduce((sum,{record})=>sum + (Number(record.total) || 0), 0));
+    document.getElementById('adminOrderCount').textContent = `${orders.length} order${orders.length === 1 ? '' : 's'}`;
+    document.getElementById('adminEscrowCount').textContent = String(deals.length);
+    document.getElementById('adminListingCount').textContent = String(COMMUNITY_LISTINGS.filter(item=>!removed.includes(item.id)).length + listings.length);
+    document.getElementById('adminCatalogCount').textContent = String(PRODUCTS.length);
+    document.getElementById('adminFigureCount').textContent = `${PRODUCTS.reduce((sum,item)=>sum+item.characters.length,0)} figures`;
+    renderAdminEscrow();
+    renderAdminOrders();
+    renderAdminCatalog();
+    renderAdminModeration();
+  };
+  window.renderAdminDashboard = renderAdminDashboard;
+  renderAdminDashboard();
+
+  document.querySelectorAll('[data-admin-tab]').forEach(button=>button.addEventListener('click', ()=>{
+    document.querySelectorAll('[data-admin-tab]').forEach(tab=>{
+      const selected = tab === button;
+      tab.classList.toggle('active', selected);
+      tab.setAttribute('aria-selected', String(selected));
+    });
+    document.querySelectorAll('[data-admin-panel]').forEach(panel=>{panel.hidden = panel.dataset.adminPanel !== button.dataset.adminTab;});
+  }));
+  document.getElementById('adminAddCatalogForm').addEventListener('submit', event=>{
+    event.preventDefault();
+    const form = event.currentTarget;
+    if(!form.reportValidity()) return;
+    const data = new FormData(form);
+    const seriesName = String(data.get('seriesName')).trim();
+    const figureName = String(data.get('figureName')).trim();
+    const price = Number(data.get('price'));
+    if(PRODUCTS.some(product=>product.name.toLowerCase() === seriesName.toLowerCase())
+      || PRODUCTS.some(product=>product.characters.some(character=>character.name.toLowerCase() === figureName.toLowerCase()))){
+      toast('That series or figure is already in the catalog');
+      return;
+    }
+    if(!Number.isFinite(price) || price <= 0){
+      toast('Enter a valid retail price greater than ₱0');
+      return;
+    }
+    const overrides = loadCatalogOverrides();
+    overrides.products.push({
+      name:seriesName,
+      series:seriesName,
+      category:String(data.get('category') || 'admin').trim().toLowerCase().replace(/[^a-z0-9-]+/g,'-'),
+      price,
+      tag:'tag-new',
+      tagText:'In stock',
+      heightCm:8,
+      image:String(data.get('image') || '').trim(),
+      characters:[{name:figureName,rarity:'Standard',odds:'1/12',image:String(data.get('image') || '').trim()}],
+    });
+    try{
+      localStorage.setItem(CATALOG_OVERRIDES_STORAGE_KEY, JSON.stringify(overrides));
+      location.reload();
+    }catch(error){
+      console.error('Could not add the new catalog figure.', error);
+      toast('The new figure could not be saved');
+    }
+  });
+}
+
 /* ================= Global click delegation (every page) ================= */
 document.addEventListener('DOMContentLoaded', ()=>{
   updateCartBadge();
   updateSignInButton();
+  initAdminDashboard();
   renderNotifications();
   updatePendingOfferBadge();
 
@@ -1968,6 +2390,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
     if(event.key === 'joytrinkets_user'){
       location.reload();
     }
+    if(event.key === CATALOG_OVERRIDES_STORAGE_KEY) location.reload();
     if(event.key && event.key.startsWith(`${NOTIFICATIONS_STORAGE_KEY}_`)) renderNotifications();
     if(event.key && event.key.startsWith(`${TRADE_OFFERS_STORAGE_KEY}_`)){
       updatePendingOfferBadge();
@@ -2165,7 +2588,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
         return;
       }
       const purchasedLines = cart.map(item=>({...item}));
-      if(!addPurchasedItemsToCollection(purchasedLines)) return;
       const itemCount = cartItemCount();
       const subtotal = cartTotal();
       const discount = itemCount >= BUNDLE_DISCOUNT_THRESHOLD ? Math.round(subtotal * BUNDLE_DISCOUNT_RATE) : 0;
@@ -2177,6 +2599,56 @@ document.addEventListener('DOMContentLoaded', ()=>{
       const name = document.getElementById('checkoutName').value.trim();
       const email = document.getElementById('checkoutEmail').value.trim();
       const mobile = mobileInput.value.trim();
+      const ordersKey = accountStorageKey('joyTrinkets_orders');
+      let orders;
+      try{
+        const savedOrders = JSON.parse(localStorage.getItem(ordersKey) || '[]');
+        orders = Array.isArray(savedOrders) ? savedOrders : [];
+      }catch(error){
+        console.error('Could not read the saved orders.', error);
+        toast('Your order history could not be updated');
+        return;
+      }
+      orders.unshift({
+        id:orderId,
+        accountId:getSignedInEmail().trim().toLowerCase(),
+        customerName:name,
+        customerEmail:email,
+        mobile,
+        address:deliveryAddress,
+        note,
+        items:purchasedLines.map(item=>({
+          name:item.name,
+          characterName:item.characterName || '',
+          seriesName:item.seriesName || item.productName || item.name,
+          quantity:item.qty,
+          unitPrice:item.price,
+          isBoxPull:Boolean(item.isBoxPull),
+        })),
+        subtotal,
+        discount,
+        shipping,
+        total:subtotal-discount+shipping,
+        payment,
+        status:'Processing',
+        createdAt:Date.now(),
+      });
+      try{
+        localStorage.setItem(ordersKey, JSON.stringify(orders));
+      }catch(error){
+        console.error('Could not save the order for Store Admin fulfillment.', error);
+        toast('Your order could not be saved; your cart is unchanged');
+        return;
+      }
+      if(!addPurchasedItemsToCollection(purchasedLines)){
+        try{
+          localStorage.setItem(ordersKey, JSON.stringify(orders.filter(order=>order.id !== orderId)));
+        }catch(error){
+          console.error('Could not roll back an order after Collection sync failed.', error);
+          toast('Your Collection could not be updated; contact Joy Trinkets before retrying');
+        }
+        return;
+      }
       const receiptLines = purchasedLines.map(item=>`
         <div class="receipt-line">
           <span><strong>${escAttr(item.name)}</strong><small>${item.isBoxPull ? `Box Pull Reveal · ${escAttr(item.seriesName || '')}` : 'Sealed Blind Box'} · Qty ${item.qty}</small></span>

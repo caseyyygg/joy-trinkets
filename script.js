@@ -8,6 +8,8 @@ import * as GaussianSplats3D from '@mkkellogg/gaussian-splats-3d';
 
 /* ================= Utilities ================= */
 const peso = n => '₱' + n.toLocaleString('en-PH');
+const NOTIFICATIONS_STORAGE_KEY = 'joytrinkets_notifications';
+const TRADE_OFFERS_STORAGE_KEY = 'joytrinkets_trade_offers';
 const MODEL_VIEWER_SETTINGS = {
   cameraUp:[0, 1, 0],
   cameraPosition:[0, 0, 1.8],
@@ -88,6 +90,78 @@ function toast(msg){
   t.classList.add('show');
   clearTimeout(t._timer);
   t._timer = setTimeout(()=> t.classList.remove('show'), 2200);
+}
+
+function loadNotifications(){
+  try{
+    const raw = localStorage.getItem(NOTIFICATIONS_STORAGE_KEY);
+    const stored = raw ? JSON.parse(raw) : [];
+    if(!Array.isArray(stored)) throw new Error('Saved notifications are not a list.');
+    return stored.filter(item=>item && typeof item.id === 'string' && typeof item.message === 'string')
+      .map(item=>({...item, createdAt:Number.isFinite(Number(item.createdAt)) ? Number(item.createdAt) : Date.now()}));
+  }catch(error){
+    console.error('Could not read notifications.', error);
+    return [];
+  }
+}
+
+function renderNotifications(){
+  const notifications = loadNotifications();
+  const unreadCount = notifications.filter(item=>!item.read).length;
+  document.querySelectorAll('[data-notification-count]').forEach(badge=>{
+    badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
+    badge.hidden = unreadCount === 0;
+  });
+  document.querySelectorAll('[data-notification-list]').forEach(list=>{
+    list.innerHTML = notifications.length
+      ? notifications.slice(0, 12).map(item=>`<a class="notification-item ${item.read ? '' : 'unread'}" href="${escAttr(item.href || 'trade.html')}#${escAttr(item.target || 'offers')}" data-notification-id="${escAttr(item.id)}"><span>${escAttr(item.message)}</span><time datetime="${new Date(item.createdAt).toISOString()}">${new Date(item.createdAt).toLocaleString()}</time></a>`).join('')
+      : '<p class="notification-empty">You’re all caught up.</p>';
+  });
+}
+
+function addNotification(message, {href='trade.html', target='offers', toastMessage=''}={}){
+  const notifications = loadNotifications();
+  notifications.unshift({
+    id:createLocalId('notification'),
+    message,
+    href,
+    target,
+    read:false,
+    createdAt:Date.now(),
+  });
+  try{
+    localStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(notifications.slice(0, 60)));
+  }catch(error){
+    console.error('Could not save notification.', error);
+    toast('Your notification could not be saved');
+  }
+  renderNotifications();
+  if(toastMessage) toast(toastMessage);
+}
+
+function markNotificationsRead(){
+  const notifications = loadNotifications().map(item=>({...item, read:true}));
+  try{
+    localStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(notifications));
+  }catch(error){
+    console.error('Could not mark notifications as read.', error);
+    toast('Notifications could not be updated');
+  }
+  renderNotifications();
+}
+
+function markNotificationRead(notificationId){
+  const notifications = loadNotifications();
+  const notification = notifications.find(item=>item.id === notificationId);
+  if(!notification || notification.read) return;
+  notification.read = true;
+  try{
+    localStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(notifications));
+  }catch(error){
+    console.error('Could not update notification status.', error);
+    toast('Notification could not be updated');
+  }
+  renderNotifications();
 }
 
 function escAttr(str){
@@ -990,6 +1064,73 @@ function saveTradeListings(listings){
   }
 }
 
+function loadTradeOffers(){
+  try{
+    const raw = localStorage.getItem(TRADE_OFFERS_STORAGE_KEY);
+    if(!raw) return [];
+    const stored = JSON.parse(raw);
+    if(!Array.isArray(stored)) throw new Error('Saved trade offers are not a list.');
+    const listingIds = new Set([...COMMUNITY_LISTINGS, ...loadTradeListings()].map(listing=>listing.id));
+    return stored.filter(offer=>offer && typeof offer.id === 'string'
+      && tradeCharacter(offer.productName, offer.characterId)
+      && ['incoming', 'sent'].includes(offer.direction)
+      && ['pending', 'approved', 'declined'].includes(offer.status)
+      && listingIds.has(offer.listingId)
+    ).map(offer=>({
+      ...offer,
+      cash:Math.max(0, Number(offer.cash) || 0),
+      offered:Array.isArray(offer.offered) ? offer.offered.filter(item=>
+        item && tradeCharacter(item.productName, item.characterId)
+      ) : [],
+    }));
+  }catch(error){
+    console.error('Could not read trade offers.', error);
+    toast('Saved trade offers could not be read');
+    return [];
+  }
+}
+
+function saveTradeOffers(offers){
+  try{
+    localStorage.setItem(TRADE_OFFERS_STORAGE_KEY, JSON.stringify(offers));
+    return true;
+  }catch(error){
+    console.error('Could not save trade offers.', error);
+    toast('Your trade offer could not be saved');
+    return false;
+  }
+}
+
+function createHubWaybill(){
+  return `JT-HUB-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+}
+
+function ensureSeedIncomingOffer(listing){
+  if(!listing.ownerPurchaseId) return;
+  const offers = loadTradeOffers();
+  if(offers.some(offer=>offer.listingId === listing.id && offer.direction === 'incoming')) return;
+  const targetKey = `${listing.productName}::${listing.characterId}`;
+  const candidate = MARKETPLACE_CHARACTERS.find(entry=>tradeKey(entry) !== targetKey)
+    || MARKETPLACE_CHARACTERS[0];
+  if(!candidate) return;
+  offers.unshift({
+    id:createLocalId('offer'),
+    listingId:listing.id,
+    productName:listing.productName,
+    characterId:listing.characterId,
+    direction:'incoming',
+    status:'pending',
+    offered:[{productName:candidate.product.name, characterId:candidate.character.id}],
+    cash:listing.acceptCash ? 120 : 0,
+    cashDirection:'add',
+    createdAt:Date.now(),
+    seeded:true,
+  });
+  if(!saveTradeOffers(offers)) return;
+  const message = listing.acceptCash ? 'New Trade + Cash offer received' : 'New trade offer received';
+  addNotification(message, {target:'offers', toastMessage:message});
+}
+
 function loadTradeDeals(){
   try{
     const raw = localStorage.getItem(TRADE_DEALS_STORAGE_KEY);
@@ -1012,7 +1153,8 @@ function loadTradeDeals(){
           cash:Math.max(0, Number(deal.cash) || 0),
           delivery:deal.delivery === 'dropoff' ? 'dropoff' : 'courier',
           offered:Array.isArray(deal.offered) ? deal.offered.filter(item=>
-            item && typeof item.purchaseId === 'string' && tradeCharacter(item.productName, item.characterId)
+            item && tradeCharacter(item.productName, item.characterId)
+            && (deal.direction === 'incoming' || typeof item.purchaseId === 'string')
           ) : [],
         };
       });
@@ -1063,10 +1205,31 @@ function listingImage(entry){
   return placeholderBox(entry.character.name, entry.character.image || entry.product.image);
 }
 
+function updatePendingOfferBadge(){
+  const pending = loadTradeOffers().filter(offer=>offer.direction === 'incoming' && offer.status === 'pending').length;
+  document.querySelectorAll('[data-pending-offer-count]').forEach(badge=>{
+    badge.textContent = String(pending);
+    badge.hidden = pending === 0;
+  });
+}
+
+function listingOwnStatus(listing, offers, deals){
+  const deal = deals.find(item=>item.id === listing.lockedDealId)
+    || deals.find(item=>item.listingId === listing.id);
+  if(deal) return deal.stage >= 5 ? 'Completed' : 'In Escrow';
+  if(listing.lockedDealId) return 'In Escrow';
+  if(offers.some(offer=>offer.listingId === listing.id && offer.direction === 'incoming' && offer.status === 'pending')){
+    return 'Offer Pending';
+  }
+  return 'Live';
+}
+
 function renderTradeListings(filter='all'){
   const host = document.getElementById('tradeListings');
   if(!host) return;
   const ownedKeys = new Set(ownedTradeCharacters().map(tradeKey));
+  const offers = loadTradeOffers();
+  const deals = loadTradeDeals();
   const listings = allTradeListings().filter(listing=>{
     if(filter === 'matches'){
       return listing.isoIds.some(key=>ownedKeys.has(key));
@@ -1083,18 +1246,23 @@ function renderTradeListings(filter='all'){
       .map(item=>`${item.character.name} · ${item.product.series}`);
     const conditionTags = listing.conditions.map(condition=>`<span class="trade-tag">${escAttr(condition)}</span>`).join('');
     const isoText = listing.openToOffers || !isoNames.length ? 'Open to offers' : isoNames.map(escAttr).join(', ');
+    const isOwnListing = Boolean(listing.owner);
+    const ownStatus = isOwnListing ? listingOwnStatus(listing, offers, deals) : '';
     const modelAction = entry.product.modelPreview && hasCharacterModel(entry.character.name)
       ? `<button type="button" class="btn btn-outline btn-sm" data-trade-model="${escAttr(listing.id)}">See 3D Model</button>`
       : '';
     return `<article class="trade-listing-card">
       <div class="trade-listing-photo">${listingImage(entry)}<span class="rarity-badge ${entry.character.rarity === 'Secret Chase' ? 'rarity-secret' : 'rarity-common'}">${escAttr(entry.character.rarity)}</span></div>
       <div class="trade-listing-content">
-        <div class="trade-listing-top"><span class="trade-type-badge trade-type-${escAttr(listing.type)}">${escAttr(listingTypeLabel(listing))}</span><span class="escrow-badge">Hub escrow</span></div>
+        <div class="trade-listing-top"><span class="trade-type-badge trade-type-${escAttr(listing.type)}">${escAttr(listingTypeLabel(listing))}${['trade', 'trade-or-buy'].includes(listing.type) && listing.acceptCash ? ' · +Cash OK' : ''}</span>${isOwnListing ? `<span class="your-listing-badge">Your Listing</span><span class="listing-status-pill status-${ownStatus.toLowerCase().replace(/\s+/g,'-')}">${ownStatus}</span>` : '<span class="escrow-badge">Hub escrow</span>'}</div>
         <h4>${escAttr(entry.character.name)}</h4><p class="trade-series">${escAttr(entry.product.series)}</p>
         <div class="trade-tags">${conditionTags || '<span class="trade-tag">Condition not specified</span>'}</div>
         <p class="trade-seller">${escAttr(listing.seller || '@collector')} <span class="verified-badge">${listing.community ? `✓ ${Number(listing.verifiedDeals) || 0} demo-verified deals · 100% legit pass` : '✓ Joy Hub check on completion'}</span></p>
         <p class="trade-iso"><b>ISO:</b> ${isoText}</p>
-        <div class="trade-listing-actions">${modelAction}<button type="button" class="btn btn-primary btn-sm" data-trade-propose="${escAttr(listing.id)}">Propose Trade / Buy</button></div>
+        ${listing.type !== 'trade' || listing.acceptCash ? `<p class="trade-listing-value">Estimated catalog value ${peso(entry.product.price)}${listing.type !== 'trade' && listing.askPrice !== entry.product.price ? ` · Asking ${peso(listing.askPrice)}` : ''}</p>` : ''}
+        <div class="trade-listing-actions">${modelAction}${isOwnListing
+          ? ownStatus === 'In Escrow' ? `<button type="button" class="btn btn-outline btn-sm" data-open-deal="${escAttr(listing.lockedDealId || (deals.find(deal=>deal.listingId === listing.id && deal.stage < 5) || {}).id || '')}">View Deal</button>` : `<button type="button" class="btn btn-outline btn-sm" data-remove-listing="${escAttr(listing.id)}">Remove Listing</button>`
+          : `<button type="button" class="btn btn-primary btn-sm" data-trade-propose="${escAttr(listing.id)}">Propose Trade / Buy</button>`}</div>
       </div>
     </article>`;
   }).join('');
@@ -1106,6 +1274,13 @@ function renderTradeListings(filter='all'){
   host.querySelectorAll('[data-trade-propose]').forEach(button=>button.addEventListener('click', ()=>{
     renderTradeProposalModal(button.dataset.tradePropose);
   }));
+  host.querySelectorAll('[data-remove-listing]').forEach(button=>button.addEventListener('click', ()=>{
+    removeOwnListing(button.dataset.removeListing);
+  }));
+  host.querySelectorAll('[data-open-deal]').forEach(button=>button.addEventListener('click', ()=>{
+    openTradeTab('deals', button.dataset.openDeal);
+  }));
+  updatePendingOfferBadge();
 }
 
 function collectionOptionLabel(owned){
@@ -1117,12 +1292,12 @@ function renderTradePostModal(){
   const defaultEntry = owned[0] || MARKETPLACE_CHARACTERS[0];
   const figureOptions = MARKETPLACE_CHARACTERS.map(entry=>`<option value="${escAttr(tradeKey(entry))}">${escAttr(entry.character.name)} · ${escAttr(entry.product.series)} — Catalog</option>`).join('');
   const ownedOptions = owned.map(entry=>`<option value="${escAttr(tradeKey(entry))}">${escAttr(collectionOptionLabel(entry))}</option>`).join('');
-  const isoOptions = MARKETPLACE_CHARACTERS.map(entry=>`<option value="${escAttr(tradeKey(entry))}">${escAttr(entry.character.name)} · ${escAttr(entry.product.series)}</option>`).join('');
+  const isoOptions = MARKETPLACE_CHARACTERS.map(entry=>`<label class="catalog-chip"><input type="checkbox" name="iso" value="${escAttr(tradeKey(entry))}"><span>${escAttr(entry.character.name)} <small>· ${escAttr(entry.product.series)}</small></span></label>`).join('');
   const signedIn = getSignedInEmail();
   const sellerHandle = signedIn ? `@${signedIn.split('@')[0].replace(/[^a-zA-Z0-9._-]/g, '').slice(0,24) || 'collector'}` : '@collector';
   openModal(`<div class="trade-form-panel">
     <span class="kicker">New marketplace listing</span><h3>Post a Trade / Sale Listing</h3>
-    <p class="modal-sub">Choose an exact character from your Collection or the existing catalog. Set your own asking price for For Sale or Trade or Buy listings.</p>
+    <p class="modal-sub">Choose an exact character from your Collection or the existing catalog. Set an asking price and choose which catalog figures you’ll accept.</p>
     <form id="tradePostForm">
       <label class="trade-field">Figure<select name="figure" required>
         ${owned.length ? `<optgroup label="Your Collection">${ownedOptions}</optgroup>` : ''}
@@ -1130,9 +1305,10 @@ function renderTradePostModal(){
       </select></label>
       <label class="trade-field">Listing type<select name="type" required><option value="trade">For Trade</option><option value="sale">For Sale</option><option value="trade-or-buy">Trade or Buy</option></select></label>
       <fieldset class="trade-field"><legend>Condition &amp; completeness</legend><div class="trade-check-grid">${TRADE_CONDITIONS.map((condition,index)=>`<label><input type="checkbox" name="conditions" value="${escAttr(condition)}" ${index === 0 ? 'checked' : ''}> ${escAttr(condition)}</label>`).join('')}</div></fieldset>
+      <fieldset class="trade-field"><legend>Accept these catalog figures</legend><div class="catalog-chip-list">${isoOptions}</div></fieldset>
+      <label class="trade-check" data-accept-cash-wrap><input name="acceptCash" type="checkbox" checked> Accept figure + cash top-up offers</label>
       <label class="trade-field">Asking price (₱)<input name="price" type="number" min="1" step="1" value="${defaultEntry.product.price}" aria-describedby="tradePriceNote"></label>
       <small id="tradePriceNote" class="trade-field-note">Pre-filled with catalog retail price (${peso(defaultEntry.product.price)}) — adjust to set your own asking price.</small>
-      <label class="trade-field">ISO — select existing catalog figures <select name="iso" multiple size="5">${isoOptions}</select></label>
       <label class="trade-check"><input name="openOffers" type="checkbox" checked> Also open to other catalog offers</label>
       <button class="btn btn-primary" type="submit">Publish listing</button>
     </form>
@@ -1140,6 +1316,14 @@ function renderTradePostModal(){
   const form = document.getElementById('tradePostForm');
   const figureSelect = form.elements.figure;
   if(defaultEntry) figureSelect.value = tradeKey(defaultEntry);
+  const listingTypeSelect = form.elements.type;
+  const acceptCashWrap = form.querySelector('[data-accept-cash-wrap]');
+  const syncAcceptCashVisibility = ()=>{
+    acceptCashWrap.hidden = listingTypeSelect.value === 'sale';
+    if(acceptCashWrap.hidden) form.elements.acceptCash.checked = false;
+  };
+  listingTypeSelect.addEventListener('change', syncAcceptCashVisibility);
+  syncAcceptCashVisibility();
   figureSelect.addEventListener('change', ()=>{
     const entry = MARKETPLACE_BY_KEY.get(figureSelect.value);
     if(entry){
@@ -1164,27 +1348,245 @@ function renderTradePostModal(){
       form.elements.price.focus();
       return;
     }
-    const selectedIso = [...form.elements.iso.selectedOptions].map(option=>option.value).filter(key=>MARKETPLACE_BY_KEY.has(key));
+    const selectedIso = [...form.querySelectorAll('[name="iso"]:checked')].map(input=>input.value).filter(key=>MARKETPLACE_BY_KEY.has(key));
+    const ownedFigure = owned.find(item=>tradeKey(item) === tradeKey(entry));
     const listings = loadTradeListings();
-    listings.unshift({
+    const listing = {
       id:createLocalId('listing'),
       productName:entry.product.name,
       characterId:entry.character.id,
       type,
       askPrice:Number.isFinite(enteredAskPrice) && enteredAskPrice > 0 ? enteredAskPrice : entry.product.price,
+      owner:true,
+      ownerPurchaseId:ownedFigure ? ownedFigure.purchaseId : '',
+      acceptCash:['trade', 'trade-or-buy'].includes(type) && form.elements.acceptCash.checked,
       conditions,
       seller:sellerHandle,
       verifiedDeals:0,
       isoIds:selectedIso,
       openToOffers:form.elements.openOffers.checked || selectedIso.length === 0,
-    });
+    };
+    listings.unshift(listing);
     if(!saveTradeListings(listings)) return;
+    ensureSeedIncomingOffer(listing);
+    addNotification('Your listing is live on the marketplace', {target:'listings', toastMessage:'Your listing is live'});
     closeModal();
     document.querySelector('[data-trade-filter="all"]').click();
     document.querySelector('[data-trade-tab="listings"]').click();
     renderTradeListings('all');
-    toast('Your catalog listing is live');
   });
+}
+
+function updateOfferStatus(offerId, status){
+  const offers = loadTradeOffers();
+  const offer = offers.find(item=>item.id === offerId);
+  if(!offer || offer.status !== 'pending') return null;
+  offer.status = status;
+  offer.updatedAt = Date.now();
+  if(!saveTradeOffers(offers)) return null;
+  updatePendingOfferBadge();
+  return offer;
+}
+
+function createApprovedDeal(offer, listing){
+  const target = tradeCharacter(listing.productName, listing.characterId);
+  if(!target) return null;
+  return {
+    id:createLocalId('deal'),
+    listingId:listing.id,
+    direction:offer.direction,
+    productName:listing.productName,
+    characterId:listing.characterId,
+    ownerPurchaseId:listing.ownerPurchaseId || '',
+    askingPrice:listing.askPrice,
+    catalogPrice:target.product.price,
+    offered:offer.offered,
+    cash:offer.cash,
+    cashDirection:offer.cashDirection || 'add',
+    delivery:'courier',
+    waybill:createHubWaybill(),
+    shipBy:Date.now() + 48 * 60 * 60 * 1000,
+    stage:0,
+    accepted:true,
+    createdAt:Date.now(),
+    seeded:offer.seeded || false,
+  };
+}
+
+function approveOffer(offerId){
+  const offers = loadTradeOffers();
+  const offer = offers.find(item=>item.id === offerId && item.status === 'pending');
+  if(!offer) return;
+  const listing = allTradeListings().find(item=>item.id === offer.listingId);
+  if(!listing){
+    toast('This listing is no longer available');
+    return;
+  }
+  const activeDeals = loadTradeDeals();
+  if(activeDeals.some(deal=>deal.listingId === listing.id && deal.stage < 5)){
+    toast('This listing already has an active escrow deal');
+    return;
+  }
+  if(offer.direction === 'incoming' && (!listing.owner || !listing.ownerPurchaseId)){
+    toast('Only a listing linked to your Collection can be approved here');
+    return;
+  }
+  const deal = createApprovedDeal(offer, listing);
+  if(!deal) return;
+  activeDeals.unshift(deal);
+  if(!saveTradeDeals(activeDeals)) return;
+  offer.status = 'approved';
+  offer.dealId = deal.id;
+  offer.updatedAt = Date.now();
+  if(!saveTradeOffers(offers)) return;
+  if(offer.direction === 'incoming'){
+    const listings = loadTradeListings();
+    const ownedListing = listings.find(item=>item.id === listing.id);
+    if(ownedListing){
+      ownedListing.lockedDealId = deal.id;
+      if(!saveTradeListings(listings)) return;
+    }
+  }
+  addNotification('Offer approved! Ship to Joy Trinkets Hub', {
+    target:`deals-${deal.id}`,
+    toastMessage:'Offer approved — escrow locked',
+  });
+  renderTradeOffers();
+  renderTradeListings();
+  renderTradeDeals();
+}
+
+function declineOffer(offerId){
+  const offer = updateOfferStatus(offerId, 'declined');
+  if(!offer) return;
+  const message = offer.direction === 'incoming' ? 'Incoming offer declined' : 'Your offer was declined';
+  addNotification(message, {target:'offers', toastMessage:message});
+  renderTradeOffers();
+  renderTradeListings();
+}
+
+function simulateSellerApproval(offerId){
+  const offers = loadTradeOffers();
+  const offer = offers.find(item=>item.id === offerId && item.direction === 'sent' && item.status === 'pending');
+  if(!offer) return;
+  const listing = allTradeListings().find(item=>item.id === offer.listingId);
+  if(!listing){
+    toast('This listing is no longer available');
+    return;
+  }
+  const activeDeals = loadTradeDeals();
+  if(activeDeals.some(deal=>deal.listingId === listing.id && deal.stage < 5)){
+    toast('This listing already has an active escrow deal');
+    return;
+  }
+  const deal = createApprovedDeal(offer, listing);
+  if(!deal) return;
+  activeDeals.unshift(deal);
+  if(!saveTradeDeals(activeDeals)) return;
+  offer.status = 'approved';
+  offer.dealId = deal.id;
+  offer.updatedAt = Date.now();
+  if(!saveTradeOffers(offers)) return;
+  addNotification('Offer approved! Ship to Joy Trinkets Hub', {
+    target:`deals-${deal.id}`,
+    toastMessage:'Seller approved — escrow locked',
+  });
+  renderTradeOffers();
+  renderTradeDeals();
+}
+
+function removeOwnListing(listingId){
+  const listings = loadTradeListings();
+  const listing = listings.find(item=>item.id === listingId && item.owner);
+  if(!listing) return;
+  if(loadTradeDeals().some(deal=>deal.listingId === listingId && deal.stage < 5)){
+    toast('This listing is locked in escrow and cannot be removed');
+    return;
+  }
+  if(!saveTradeListings(listings.filter(item=>item.id !== listingId))) return;
+  if(!saveTradeOffers(loadTradeOffers().filter(offer=>offer.listingId !== listingId))) return;
+  renderTradeListings();
+  renderTradeOffers();
+  toast('Listing removed');
+}
+
+function formatRemainingTime(timestamp){
+  const deadline = Number(timestamp);
+  const remaining = Number.isFinite(deadline) ? Math.max(0, deadline - Date.now()) : 48 * 60 * 60 * 1000;
+  return `${Math.floor(remaining / 3600000)}h ${Math.floor((remaining % 3600000) / 60000)}m`;
+}
+
+function updateShippingCountdowns(){
+  document.querySelectorAll('[data-ship-by]').forEach(label=>{
+    const deadline = Number(label.dataset.shipBy);
+    label.textContent = Number.isFinite(deadline) && deadline > Date.now()
+      ? formatRemainingTime(deadline)
+      : 'Time expired — contact Joy Trinkets Hub';
+  });
+}
+
+function renderTradeOffers(){
+  const incomingHost = document.getElementById('incomingOffers');
+  const sentHost = document.getElementById('sentOffers');
+  if(!incomingHost || !sentHost) return;
+  const offers = loadTradeOffers();
+  const incoming = offers.filter(offer=>offer.direction === 'incoming');
+  const sent = offers.filter(offer=>offer.direction === 'sent');
+  const describeOffer = offer=>{
+    const target = tradeCharacter(offer.productName, offer.characterId);
+    const offeredNames = offer.offered.map(item=>tradeCharacter(item.productName, item.characterId)).filter(Boolean)
+      .map(item=>`${item.character.name} · ${item.product.series}`);
+    return {target, offeredNames};
+  };
+  incomingHost.innerHTML = incoming.length ? incoming.map(offer=>{
+    const {target, offeredNames} = describeOffer(offer);
+    if(!target) return '';
+    const status = offer.status === 'pending' ? 'Needs Your Approval' : offer.status === 'approved' ? 'Approved · In Escrow' : 'Declined';
+    const cashLabel = offer.cash ? ` + ${peso(offer.cash)} ${offer.cashDirection === 'request' ? 'requested' : 'top-up'}` : '';
+    return `<article class="offer-inbox-card">
+      <div><span class="kicker">${offer.seeded ? 'Community offer' : 'Incoming offer'}</span><h5>${escAttr(target.character.name)} · ${escAttr(target.product.series)}</h5>
+      <p>They offer: ${offeredNames.length ? offeredNames.map(escAttr).join(', ') : 'Cash only'}${cashLabel}</p>
+      <span class="offer-status status-${offer.status}">${status}</span></div>
+      ${offer.status === 'pending' ? `<div class="offer-actions"><button type="button" class="btn btn-primary btn-sm" data-approve-offer="${escAttr(offer.id)}">Approve &amp; Lock Escrow</button><button type="button" class="btn btn-outline btn-sm" data-decline-offer="${escAttr(offer.id)}">Decline</button></div>` : ''}
+    </article>`;
+  }).join('') : '<p class="trade-empty-inline">No incoming offers yet. Post a Collection figure to receive a demo offer.</p>';
+  sentHost.innerHTML = sent.length ? sent.map(offer=>{
+    const {target, offeredNames} = describeOffer(offer);
+    if(!target) return '';
+    const status = offer.status === 'pending' ? 'Pending Seller Approval' : offer.status === 'approved' ? 'Approved · In Escrow' : 'Declined';
+    const cashLabel = offer.cash ? `${offer.cashDirection === 'request' ? 'Request' : 'You add'} ${peso(offer.cash)}` : '';
+    return `<article class="offer-inbox-card">
+      <div><span class="kicker">Sent offer</span><h5>${escAttr(target.character.name)} · ${escAttr(target.product.series)}</h5>
+      <p>Your figures: ${offeredNames.length ? offeredNames.map(escAttr).join(', ') : 'Cash only'}${cashLabel ? ` · ${escAttr(cashLabel)}` : ''}</p>
+      <span class="offer-status status-${offer.status}">${status}</span></div>
+      ${offer.status === 'pending' ? `<div class="offer-actions"><button type="button" class="btn btn-outline btn-sm" data-simulate-approval="${escAttr(offer.id)}">Simulate Seller Approval</button><button type="button" class="btn btn-outline btn-sm" data-decline-offer="${escAttr(offer.id)}">Withdraw</button></div>` : ''}
+    </article>`;
+  }).join('') : '<p class="trade-empty-inline">You have not sent any offers yet.</p>';
+  incomingHost.querySelectorAll('[data-approve-offer]').forEach(button=>button.addEventListener('click', ()=>approveOffer(button.dataset.approveOffer)));
+  document.querySelectorAll('[data-decline-offer]').forEach(button=>button.addEventListener('click', ()=>declineOffer(button.dataset.declineOffer)));
+  sentHost.querySelectorAll('[data-simulate-approval]').forEach(button=>button.addEventListener('click', ()=>simulateSellerApproval(button.dataset.simulateApproval)));
+  updatePendingOfferBadge();
+}
+
+function openTradeTab(tabName, dealId=''){
+  const tab = document.querySelector(`[data-trade-tab="${tabName}"]`);
+  if(!tab) return;
+  document.querySelectorAll('[data-trade-tab]').forEach(button=>{
+    const active = button === tab;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-selected', String(active));
+  });
+  document.querySelectorAll('[data-trade-panel]').forEach(panel=>{
+    panel.hidden = panel.dataset.tradePanel !== tabName;
+  });
+  if(tabName === 'offers') renderTradeOffers();
+  if(tabName === 'deals'){
+    renderTradeDeals();
+    if(dealId){
+      const card = [...document.querySelectorAll('[data-deal-card]')].find(item=>item.dataset.dealCard === dealId);
+      if(card) card.scrollIntoView({behavior:'smooth', block:'center'});
+    }
+  }
 }
 
 function tradeOfferFormState(body){
@@ -1193,6 +1595,7 @@ function tradeOfferFormState(body){
   return {
     offered: [...form.querySelectorAll('[name="offered"]:checked')].map(input=>input.value),
     cash:form.elements.cash.value,
+    cashDirection:form.elements.cashDirection ? form.elements.cashDirection.value : 'add',
     delivery:form.elements.delivery.value,
     fullBuy:form.elements.fullBuy ? form.elements.fullBuy.checked : false,
   };
@@ -1210,7 +1613,10 @@ function renderTradeProposalModal(listingId, restoredState={}){
     .map(item=>`${item.character.name} · ${item.product.series}`);
   const requiresPurchase = listing.type === 'sale';
   const canBuy = listing.type !== 'trade';
-  const cashValue = restoredState.cash ?? (requiresPurchase ? listing.askPrice : 0);
+  const canCash = listing.type === 'sale' || listing.acceptCash;
+  const targetFigureValue = listing.type === 'trade' ? entry.product.price : listing.askPrice;
+  const cashValue = restoredState.cash ?? (requiresPurchase || restoredState.fullBuy ? listing.askPrice : 0);
+  const cashDirection = restoredState.cashDirection || 'add';
   const offerRows = owned.length ? owned.map((item,index)=>{
     const checked = (restoredState.offered || []).includes(item.purchaseId);
     return `<label class="trade-offer-item">
@@ -1239,8 +1645,15 @@ function renderTradeProposalModal(listingId, restoredState={}){
       <form class="trade-proposal-offer" id="tradeProposalForm">
         <h4>Your offer</h4>
         <fieldset class="trade-field"><legend>Figures from your Collection</legend><div class="trade-offer-list">${offerRows}</div></fieldset>
+        <div class="fair-value-box" data-fair-value-box>
+          <b>Fair-Value Balance</b>
+          <span>Target Figure Value <strong data-target-value>${peso(targetFigureValue)}</strong></span>
+          <span>Your Selected Collection Figure(s) Total <strong data-selected-value>${peso(0)}</strong></span>
+          <span>Value Difference <strong data-value-difference>${peso(targetFigureValue)}</strong></span>
+        </div>
         ${canBuy ? `<label class="trade-check"><input type="checkbox" name="fullBuy" ${requiresPurchase || restoredState.fullBuy ? 'checked' : ''} ${requiresPurchase ? 'disabled' : ''}> Pay full asking price (${peso(listing.askPrice)})</label>` : ''}
-        <label class="trade-field">Cash top-up / payment (₱)<input name="cash" type="number" min="0" step="1" value="${Number(cashValue) || 0}" ${requiresPurchase || restoredState.fullBuy ? 'disabled' : ''}></label>
+        <label class="trade-field">Cash top-up / payment (₱)<input name="cash" type="number" min="0" step="1" value="${Number(cashValue) || 0}" ${requiresPurchase || !canCash || restoredState.fullBuy ? 'disabled' : ''}></label>
+        ${!requiresPurchase && canCash ? `<div class="cash-direction-row"><label class="trade-field">Cash direction<select name="cashDirection"><option value="add" ${cashDirection === 'add' ? 'selected' : ''}>You add cash</option><option value="request" ${cashDirection === 'request' ? 'selected' : ''}>Request cash</option></select></label><button class="btn btn-outline btn-sm" type="button" data-auto-fill-difference>Auto-Fill Difference (${peso(Math.abs(targetFigureValue))})</button></div>` : ''}
         <label class="trade-field">Delivery method<select name="delivery"><option value="courier" ${restoredState.delivery !== 'dropoff' ? 'selected' : ''}>Courier to Joy Trinkets Hub</option><option value="dropoff" ${restoredState.delivery === 'dropoff' ? 'selected' : ''}>Drop Off In-Store</option></select></label>
         <div class="trade-escrow-breakdown"><b>Legit Check &amp; Escrow Protection</b><span>Seller asking price: ${peso(listing.askPrice)}</span><span>Catalog retail reference: ${peso(entry.product.price)}</span><span>Offer cash: <strong data-offer-cash>${peso(Number(cashValue) || 0)}</strong></span><span>Hub check &amp; escrow fee: Confirmed at handoff; not charged in this demo</span><small>No payment is collected on this static demo. Figures transfer to Collection only after the final tracker step.</small></div>
         <button class="btn btn-primary" type="submit">Send offer to seller</button>
@@ -1251,12 +1664,41 @@ function renderTradeProposalModal(listingId, restoredState={}){
   const fullBuy = form.elements.fullBuy;
   const cashInput = form.elements.cash;
   const cashDisplay = form.querySelector('[data-offer-cash]');
+  const autoFillDifference = form.querySelector('[data-auto-fill-difference]');
+  const selectedValue = form.querySelector('[data-selected-value]');
+  const valueDifference = form.querySelector('[data-value-difference]');
+  const updateFairValue = ()=>{
+    const selectedTotal = [...form.querySelectorAll('[name="offered"]:checked')].reduce((total,input)=>{
+      const offeredEntry = owned.find(item=>item.purchaseId === input.value);
+      return total + (offeredEntry ? offeredEntry.product.price : 0);
+    }, 0);
+    const difference = targetFigureValue - selectedTotal;
+    selectedValue.textContent = peso(selectedTotal);
+    valueDifference.textContent = `${difference > 0 ? 'You add +' : difference < 0 ? 'Request +' : ''}${peso(Math.abs(difference))}`;
+    if(form.elements.cashDirection){
+      form.elements.cashDirection.value = difference < 0 ? 'request' : 'add';
+      autoFillDifference.textContent = `Auto-Fill Difference (${difference < 0 ? 'Request +' : '+'}${peso(Math.abs(difference))})`;
+    }
+  };
+  form.querySelectorAll('[name="offered"]').forEach(input=>input.addEventListener('change', updateFairValue));
+  if(autoFillDifference) autoFillDifference.addEventListener('click', ()=>{
+    const selectedTotal = [...form.querySelectorAll('[name="offered"]:checked')].reduce((total,input)=>{
+      const offeredEntry = owned.find(item=>item.purchaseId === input.value);
+      return total + (offeredEntry ? offeredEntry.product.price : 0);
+    }, 0);
+    const difference = targetFigureValue - selectedTotal;
+    form.elements.cash.value = Math.abs(difference);
+    if(form.elements.cashDirection) form.elements.cashDirection.value = difference < 0 ? 'request' : 'add';
+    if(fullBuy) fullBuy.checked = false;
+    syncPayment();
+  });
   const syncPayment = ()=>{
     const fullPayment = Boolean(fullBuy && fullBuy.checked);
     if(fullPayment) cashInput.value = listing.askPrice;
-    cashInput.disabled = requiresPurchase || fullPayment;
+    cashInput.disabled = requiresPurchase || !canCash || fullPayment;
     cashDisplay.textContent = peso(Number(cashInput.value) || 0);
   };
+  updateFairValue();
   if(fullBuy) fullBuy.addEventListener('change', syncPayment);
   cashInput.addEventListener('input', ()=>{ cashDisplay.textContent = peso(Number(cashInput.value) || 0); });
   const modelButton = document.querySelector('#modalBody [data-proposal-model]');
@@ -1273,32 +1715,28 @@ function renderTradeProposalModal(listingId, restoredState={}){
     const currentOwned = ownedTradeCharacters();
     const offered = offeredIds.map(id=>currentOwned.find(item=>item.purchaseId === id)).filter(Boolean)
       .map(item=>({purchaseId:item.purchaseId, productName:item.product.name, characterId:item.character.id}));
-    const cash = requiresPurchase || fullPayment ? listing.askPrice : Math.max(0, Number(cashInput.value) || 0);
+    const cash = requiresPurchase || fullPayment ? listing.askPrice : canCash ? Math.max(0, Number(cashInput.value) || 0) : 0;
     if(!requiresPurchase && !offered.length && cash <= 0){
       toast('Choose a Collection figure or enter a cash top-up');
       return;
     }
-    const deals = loadTradeDeals();
-    const deal = {
-      id:createLocalId('deal'),
+    const offers = loadTradeOffers();
+    offers.unshift({
+      id:createLocalId('offer'),
       listingId:listing.id,
       productName:entry.product.name,
       characterId:entry.character.id,
-      askingPrice:listing.askPrice,
-      catalogPrice:entry.product.price,
+      direction:'sent',
+      status:'pending',
       offered,
       cash,
-      delivery:form.elements.delivery.value,
-      stage:0,
-      accepted:false,
+      cashDirection:requiresPurchase || fullPayment || !form.elements.cashDirection ? 'add' : form.elements.cashDirection.value,
       createdAt:Date.now(),
-    };
-    deals.unshift(deal);
-    if(!saveTradeDeals(deals)) return;
+    });
+    if(!saveTradeOffers(offers)) return;
     closeModal();
-    document.querySelector('[data-trade-tab="deals"]').click();
-    renderTradeDeals();
-    toast('Offer sent — follow it in My Active Deals');
+    openTradeTab('offers');
+    addNotification('Your offer was sent — pending seller approval', {target:'offers', toastMessage:'Offer sent to seller'});
   });
 }
 
@@ -1315,8 +1753,16 @@ function transferTradeDealToCollection(deal){
     toast('Your Collection could not be updated; this deal step was not completed');
     return false;
   }
-  if(collection.some(item=>item.purchaseId === transferId)) return true;
-  for(const offered of deal.offered || []){
+  if(collection.some(item=>item.tradeDealId === deal.id)) return true;
+  const isSeller = deal.direction === 'incoming';
+  if(isSeller && !deal.ownerPurchaseId){
+    toast('The listed figure is not linked to your Collection; transfer was stopped');
+    return false;
+  }
+  const transferOut = isSeller
+    ? [{purchaseId:deal.ownerPurchaseId, productName:deal.productName, characterId:deal.characterId}]
+    : (deal.offered || []);
+  for(const offered of transferOut){
     const item = collection.find(record=>record.purchaseId === offered.purchaseId
       && record.productName === offered.productName && record.characterId === offered.characterId);
     if(!item || item.qty < 1){
@@ -1324,29 +1770,36 @@ function transferTradeDealToCollection(deal){
       return false;
     }
   }
-  (deal.offered || []).forEach(offered=>{
+  transferOut.forEach(offered=>{
     const item = collection.find(record=>record.purchaseId === offered.purchaseId);
     item.qty--;
   });
   const remaining = collection.filter(item=>item.qty > 0);
-  const target = tradeCharacter(deal.productName, deal.characterId);
-  if(!target) return false;
-  remaining.push({
-    purchaseId:transferId,
-    kind:'character',
-    name:target.character.name,
-    characterName:target.character.name,
-    productName:target.product.name,
-    seriesName:target.product.series,
-    qty:1,
-    image:target.character.image || target.product.image || '',
-    price:target.product.price,
-    characterId:target.character.id,
-    rarity:target.character.rarity,
-    odds:target.character.odds,
-    modelUrl:target.character.modelUrl || '',
-    modelOrientation:target.character.modelOrientation || null,
-  });
+  const receivedEntries = isSeller ? (deal.offered || []) : [{
+    productName:deal.productName,
+    characterId:deal.characterId,
+  }];
+  for(const [index, received] of receivedEntries.entries()){
+    const target = tradeCharacter(received.productName, received.characterId);
+    if(!target) return false;
+    remaining.push({
+      purchaseId:`${transferId}-${index}`,
+      tradeDealId:deal.id,
+      kind:'character',
+      name:target.character.name,
+      characterName:target.character.name,
+      productName:target.product.name,
+      seriesName:target.product.series,
+      qty:1,
+      image:target.character.image || target.product.image || '',
+      price:target.product.price,
+      characterId:target.character.id,
+      rarity:target.character.rarity,
+      odds:target.character.odds,
+      modelUrl:target.character.modelUrl || '',
+      modelOrientation:target.character.modelOrientation || null,
+    });
+  }
   return saveCollection(remaining);
 }
 
@@ -1364,12 +1817,14 @@ function renderTradeDeals(){
       const target = tradeCharacter(offered.productName, offered.characterId);
       return target ? target.character.name : '';
     }).filter(Boolean);
-    const currentStage = deal.stage === 0 ? 'Pending seller agreement' : TRADE_STAGES[deal.stage - 1];
-    return `<article class="trade-deal-card">
+    const currentStage = deal.stage === 0 ? 'Escrow Locked' : deal.stage >= 5 ? 'Completed' : TRADE_STAGES[deal.stage - 1];
+    const cashLabel = deal.cash ? `${deal.cashDirection === 'request' ? 'Request' : 'You add'} ${peso(deal.cash)}` : '';
+    return `<article class="trade-deal-card" data-deal-card="${escAttr(deal.id)}">
       <div class="trade-deal-summary">${listingImage(entry)}<div><span class="kicker">${deal.stage === 5 ? 'Completed deal' : 'Active deal'}</span><h4>${escAttr(entry.character.name)}</h4><p>${escAttr(entry.product.series)} · Asking ${peso(deal.askingPrice)} · Catalog ${peso(entry.product.price)}</p></div><span class="trade-deal-status">${escAttr(currentStage)}</span></div>
-      <div class="trade-deal-meta"><span>Offer: ${offeredText.length ? offeredText.map(escAttr).join(', ') : 'Cash only'}${deal.cash ? ` + ${peso(deal.cash)}` : ''}</span><span>Delivery: ${deal.delivery === 'dropoff' ? 'Drop Off In-Store' : 'Courier to Joy Trinkets Hub'}</span></div>
+      <div class="trade-deal-meta"><span>Offer: ${offeredText.length ? offeredText.map(escAttr).join(', ') : 'Cash only'}${cashLabel ? ` · ${escAttr(cashLabel)}` : ''}</span><span>Delivery: ${deal.delivery === 'dropoff' ? 'Drop Off In-Store' : 'Courier to Joy Trinkets Hub'}</span></div>
+      ${deal.stage < 5 ? `<div class="trade-waybill"><b>Joy Trinkets Hub Waybill / Drop-Off Code</b><strong>${escAttr(deal.waybill || 'JT-HUB-PENDING')}</strong><span>Ship or drop off within <time data-ship-by="${Number(deal.shipBy) || 0}">${formatRemainingTime(deal.shipBy)}</time></span></div>` : ''}
       <ol class="trade-stage-list">${TRADE_STAGES.map((stage,index)=>`<li class="${deal.stage > index ? 'complete' : deal.stage === index + 1 ? 'current' : ''}"><span>${index + 1}</span><div><b>${escAttr(stage)}</b>${index === 2 ? '<small>Authentic sculpt, paint, foil/box and collector ID card review</small>' : ''}</div></li>`).join('')}</ol>
-      <button class="btn btn-outline btn-sm" type="button" data-trade-next="${escAttr(deal.id)}" ${deal.stage >= 5 ? 'disabled' : ''}>${deal.stage === 0 ? 'Simulate Next Legit Check Step' : deal.stage >= 5 ? 'Deal completed' : 'Simulate Next Legit Check Step'}</button>
+      <button class="btn btn-outline btn-sm" type="button" data-trade-next="${escAttr(deal.id)}" ${deal.stage >= 5 ? 'disabled' : ''}>${deal.stage >= 5 ? 'Deal completed' : deal.stage === 0 ? 'Confirm Hub Drop-Off / Shipment' : deal.stage === 1 ? 'Confirm In-Store Legit Check' : deal.stage === 2 ? 'Approve & Dispatch' : 'Advance Legit Check & Escrow'}</button>
     </article>`;
   }).join('');
   host.querySelectorAll('[data-trade-next]').forEach(button=>button.addEventListener('click', ()=>{
@@ -1381,8 +1836,23 @@ function renderTradeDeals(){
     deal.stage = nextStage;
     deal.accepted = true;
     if(!saveTradeDeals(updated)) return;
+    const stageMessages = [
+      'Package marked shipped / dropped off at Joy Trinkets Hub',
+      '✅ In-Store Legit Check Approved — Dispatched',
+      'Figure dispatched to receiver',
+      'Receiver confirmed delivery',
+      deal.direction === 'incoming' && !deal.offered.length ? 'Sale completed — your Collection updated' : 'Figure added to your Collection',
+    ];
+    if(nextStage > 0){
+      addNotification(stageMessages[nextStage - 1], {
+        target:nextStage === 5 ? 'collection' : `deals-${deal.id}`,
+        href:nextStage === 5 ? 'shelf.html' : 'trade.html',
+        toastMessage:stageMessages[nextStage - 1],
+      });
+    }
     renderTradeDeals();
-    toast(nextStage === 5 ? 'Deal completed — your Collection is updated' : TRADE_STAGES[nextStage - 1]);
+    renderTradeListings();
+    if(nextStage === 5) renderTradeOffers();
   }));
 }
 
@@ -1402,6 +1872,47 @@ function renderInfoModal(key){
 document.addEventListener('DOMContentLoaded', ()=>{
   updateCartBadge();
   updateSignInButton();
+  renderNotifications();
+  updatePendingOfferBadge();
+
+  document.querySelectorAll('[data-notification-toggle]').forEach(button=>button.addEventListener('click', event=>{
+    event.stopPropagation();
+    const dropdown = document.getElementById(button.getAttribute('aria-controls'));
+    const opening = dropdown.hidden;
+    dropdown.hidden = !opening;
+    button.setAttribute('aria-expanded', String(opening));
+  }));
+  document.querySelectorAll('[data-notification-read-all]').forEach(button=>button.addEventListener('click', markNotificationsRead));
+  document.querySelectorAll('[data-notification-list]').forEach(list=>list.addEventListener('click', event=>{
+    const link = event.target.closest('[data-notification-id]');
+    if(!link) return;
+    markNotificationRead(link.dataset.notificationId);
+    const target = link.hash.slice(1);
+    if(location.pathname.endsWith('trade.html') && (target === 'offers' || target === 'listings' || target.startsWith('deals-'))){
+      event.preventDefault();
+      const tabName = target.startsWith('deals-') ? 'deals' : target;
+      openTradeTab(tabName, target.startsWith('deals-') ? target.slice(6) : '');
+      const dropdown = document.getElementById('notificationDropdown');
+      dropdown.hidden = true;
+      document.querySelector('[data-notification-toggle]').setAttribute('aria-expanded', 'false');
+    }
+  }));
+  document.addEventListener('click', event=>{
+    document.querySelectorAll('.notification-dropdown:not([hidden])').forEach(dropdown=>{
+      if(event.target.closest('.notification-wrap')) return;
+      dropdown.hidden = true;
+      const toggle = document.querySelector(`[aria-controls="${dropdown.id}"]`);
+      if(toggle) toggle.setAttribute('aria-expanded', 'false');
+    });
+  });
+  window.addEventListener('storage', event=>{
+    if(event.key === NOTIFICATIONS_STORAGE_KEY) renderNotifications();
+    if(event.key === TRADE_OFFERS_STORAGE_KEY){
+      updatePendingOfferBadge();
+      renderTradeOffers();
+      renderTradeListings();
+    }
+  });
 
   // highlight the current page in the nav
   const here = location.pathname.split('/').pop() || 'index.html';
@@ -2044,6 +2555,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
   if(tradeListings){
     renderTradeListings();
     renderTradeDeals();
+    renderTradeOffers();
+    updateShippingCountdowns();
+    setInterval(updateShippingCountdowns, 60000);
     document.querySelectorAll('[data-trade-filter]').forEach(button=>button.addEventListener('click', ()=>{
       document.querySelectorAll('[data-trade-filter]').forEach(filterButton=>{
         const active = filterButton === button;
@@ -2052,17 +2566,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
       });
       renderTradeListings(button.dataset.tradeFilter);
     }));
-    document.querySelectorAll('[data-trade-tab]').forEach(button=>button.addEventListener('click', ()=>{
-      document.querySelectorAll('[data-trade-tab]').forEach(tab=>{
-        const active = tab === button;
-        tab.classList.toggle('active', active);
-        tab.setAttribute('aria-selected', String(active));
-      });
-      document.querySelectorAll('[data-trade-panel]').forEach(panel=>{
-        panel.hidden = panel.dataset.tradePanel !== button.dataset.tradeTab;
-      });
-      if(button.dataset.tradeTab === 'deals') renderTradeDeals();
-    }));
+    document.querySelectorAll('[data-trade-tab]').forEach(button=>button.addEventListener('click', ()=>openTradeTab(button.dataset.tradeTab)));
     document.querySelector('[data-trade-post]').addEventListener('click', renderTradePostModal);
+    if(location.hash === '#offers') openTradeTab('offers');
+    else if(location.hash.startsWith('#deals-')) openTradeTab('deals', location.hash.slice(7));
   }
 });

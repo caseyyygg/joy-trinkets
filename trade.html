@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/jpeg" href="https://imgur.com/QQU8ro6.jpeg">
 <title>Trading & Fair Drops — Joy Trinkets</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -21,7 +22,7 @@
 <header>
   <div class="wrap">
     <nav>
-      <a class="logo" href="index.html">Joy<span>Trinkets</span></a>
+      <a class="logo" href="index.html"><img class="logo-image" src="https://imgur.com/QQU8ro6.jpeg" alt="Joy Trinkets"></a>
       <div class="nav-links" id="primaryNav">
         <a href="categories.html">Categories</a>
         <a href="drops.html">Drops</a>
@@ -32,6 +33,13 @@
       <button class="nav-toggle" type="button" data-nav-toggle aria-controls="primaryNav" aria-expanded="false" aria-label="Open navigation"><span class="nav-toggle-lines" aria-hidden="true"></span></button>
       <div class="nav-right">
         <button class="btn btn-outline btn-sm" data-modal="signin">Sign in</button>
+        <div class="notification-wrap">
+          <button class="icon-btn notification-bell" type="button" aria-label="Notifications" aria-expanded="false" aria-controls="notificationDropdown" data-notification-toggle>🔔<span class="badge-count" data-notification-count hidden>0</span></button>
+          <div class="notification-dropdown" id="notificationDropdown" hidden>
+            <div class="notification-heading"><b>Notifications &amp; Approvals</b><button type="button" data-notification-read-all>Mark all read</button></div>
+            <div class="notification-list" data-notification-list></div>
+          </div>
+        </div>
         <button class="icon-btn" data-modal="cart" aria-label="Open cart">🛍<span class="badge-count" id="cartCount">0</span></button>
       </div>
     </nav>
@@ -53,6 +61,7 @@
         </div>
         <div class="trade-tabs" role="tablist" aria-label="Trade marketplace sections">
           <button type="button" class="trade-tab active" role="tab" aria-selected="true" data-trade-tab="listings">Marketplace listings</button>
+          <button type="button" class="trade-tab" role="tab" aria-selected="false" data-trade-tab="offers">Offers Inbox <span class="trade-tab-count" data-pending-offer-count>0</span></button>
           <button type="button" class="trade-tab" role="tab" aria-selected="false" data-trade-tab="deals">My Active Deals</button>
         </div>
         <div id="tradeListingsPanel" data-trade-panel="listings">
@@ -68,6 +77,12 @@
         <div id="tradeDealsPanel" data-trade-panel="deals" hidden>
           <div id="tradeDeals"></div>
         </div>
+        <div id="tradeOffersPanel" data-trade-panel="offers" hidden>
+          <div class="offers-inbox">
+            <section><h4>Incoming Offers <small>(Needs Your Approval)</small></h4><div id="incomingOffers"></div></section>
+            <section><h4>Sent Offers</h4><div id="sentOffers"></div></section>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -77,7 +92,7 @@
   <div class="wrap">
     <div class="footer-grid">
       <div>
-        <a class="logo" href="index.html">Joy<span>Trinkets</span></a>
+        <a class="logo" href="index.html"><img class="logo-image" src="https://imgur.com/QQU8ro6.jpeg" alt="Joy Trinkets"></a>
         <p style="color:var(--muted); font-size:13.5px; margin-top:14px; max-width:260px;">Thoughtfully curated collectibles, clear prices, and a collector-first shopping experience.</p>
       </div>
       <div>

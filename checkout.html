@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/jpeg" href="https://imgur.com/QQU8ro6.jpeg">
 <title>Checkout — Joy Trinkets</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -21,7 +22,7 @@
 <header>
   <div class="wrap">
     <nav>
-      <a class="logo" href="index.html">Joy<span>Trinkets</span></a>
+      <a class="logo" href="index.html"><img class="logo-image" src="https://imgur.com/QQU8ro6.jpeg" alt="Joy Trinkets"></a>
       <div class="nav-links" id="primaryNav">
         <a href="categories.html">Categories</a>
         <a href="drops.html">Drops</a>
@@ -32,6 +33,13 @@
       <button class="nav-toggle" type="button" data-nav-toggle aria-controls="primaryNav" aria-expanded="false" aria-label="Open navigation"><span class="nav-toggle-lines" aria-hidden="true"></span></button>
       <div class="nav-right">
         <button class="btn btn-outline btn-sm" data-modal="signin">Sign in</button>
+        <div class="notification-wrap">
+          <button class="icon-btn notification-bell" type="button" aria-label="Notifications" aria-expanded="false" aria-controls="notificationDropdown" data-notification-toggle>🔔<span class="badge-count" data-notification-count hidden>0</span></button>
+          <div class="notification-dropdown" id="notificationDropdown" hidden>
+            <div class="notification-heading"><b>Notifications &amp; Approvals</b><button type="button" data-notification-read-all>Mark all read</button></div>
+            <div class="notification-list" data-notification-list></div>
+          </div>
+        </div>
         <button class="icon-btn" data-modal="cart" aria-label="Open cart">🛍<span class="badge-count" id="cartCount">0</span></button>
       </div>
     </nav>

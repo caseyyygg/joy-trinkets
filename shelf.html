@@ -57,7 +57,13 @@
         <li><span class="feature-num">03</span><div><h4>Chase figure alerts</h4><p>Get notified the moment a secret or low-count figure from a set you're chasing goes up for trade.</p></div></li>
       </ul>
     </div>
-    <div class="shelf-mock">
+    <div class="shelf-auth-prompt" id="shelfAuthPrompt" hidden>
+      <div class="icon-badge">♡</div>
+      <h3>Sign in to view your Collection</h3>
+      <p>Purchased blind boxes and completed trades are saved to your personal collector shelf.</p>
+      <button class="btn btn-primary" type="button" data-modal="signin">Sign in / Create Account</button>
+    </div>
+    <div class="shelf-mock" id="shelfCollection">
       <div class="shelf-mock-head"><b>My collection</b><span id="collectionCount" style="font-size:13px; color:var(--muted);"></span></div>
       <div class="progress-track"><div class="progress-fill" id="collectionProgress"></div></div>
       <div class="shelf-row" id="shelfRow"></div>

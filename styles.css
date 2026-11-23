@@ -325,6 +325,12 @@ nav{display:flex; align-items:center; justify-content:space-between; padding:18p
 .shelf-panel{display:grid; grid-template-columns:1fr 1fr; gap:52px; align-items:center;}
 @media(max-width:900px){.shelf-panel{grid-template-columns:1fr;}}
 .shelf-mock{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:24px;}
+.shelf-auth-prompt,.checkout-auth-prompt,.trade-auth-prompt{padding:32px 24px;text-align:center;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);}
+.shelf-auth-prompt{grid-column:1/-1;max-width:620px;width:100%;justify-self:center;}
+.shelf-auth-prompt h3,.checkout-auth-prompt h2,.trade-auth-prompt h3{font:600 23px 'Fredoka',sans-serif;margin:12px 0 8px;}
+.shelf-auth-prompt p,.checkout-auth-prompt p,.trade-auth-prompt p{max-width:480px;margin:0 auto 18px;color:var(--muted);font-size:14px;}
+.trade-auth-prompt{margin:12px 0;}
+.trade-tab-locked{opacity:.72;}
 .shelf-mock-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;}
 .shelf-mock-head b{font-family:'Fredoka',sans-serif; font-size:15px;}
 .progress-track{height:8px; background:var(--surface-2); border-radius:999px; overflow:hidden; margin-bottom:20px;}

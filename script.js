@@ -98,8 +98,9 @@ function toast(msg){
 }
 
 function loadNotifications(){
+  if(!getSignedInEmail()) return [];
   try{
-    const raw = localStorage.getItem(NOTIFICATIONS_STORAGE_KEY);
+    const raw = localStorage.getItem(accountStorageKey(NOTIFICATIONS_STORAGE_KEY));
     const stored = raw ? JSON.parse(raw) : [];
     if(!Array.isArray(stored)) throw new Error('Saved notifications are not a list.');
     return stored.filter(item=>item && typeof item.id === 'string' && typeof item.message === 'string')
@@ -125,6 +126,10 @@ function renderNotifications(){
 }
 
 function addNotification(message, {href='trade.html', target='offers', toastMessage=''}={}){
+  if(!getSignedInEmail()){
+    if(toastMessage) toast(toastMessage);
+    return;
+  }
   const notifications = loadNotifications();
   notifications.unshift({
     id:createLocalId('notification'),
@@ -135,7 +140,7 @@ function addNotification(message, {href='trade.html', target='offers', toastMess
     createdAt:Date.now(),
   });
   try{
-    localStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(notifications.slice(0, 60)));
+    localStorage.setItem(accountStorageKey(NOTIFICATIONS_STORAGE_KEY), JSON.stringify(notifications.slice(0, 60)));
   }catch(error){
     console.error('Could not save notification.', error);
     toast('Your notification could not be saved');
@@ -145,9 +150,10 @@ function addNotification(message, {href='trade.html', target='offers', toastMess
 }
 
 function markNotificationsRead(){
+  if(!getSignedInEmail()) return;
   const notifications = loadNotifications().map(item=>({...item, read:true}));
   try{
-    localStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(notifications));
+    localStorage.setItem(accountStorageKey(NOTIFICATIONS_STORAGE_KEY), JSON.stringify(notifications));
   }catch(error){
     console.error('Could not mark notifications as read.', error);
     toast('Notifications could not be updated');
@@ -156,12 +162,13 @@ function markNotificationsRead(){
 }
 
 function markNotificationRead(notificationId){
+  if(!getSignedInEmail()) return;
   const notifications = loadNotifications();
   const notification = notifications.find(item=>item.id === notificationId);
   if(!notification || notification.read) return;
   notification.read = true;
   try{
-    localStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(notifications));
+    localStorage.setItem(accountStorageKey(NOTIFICATIONS_STORAGE_KEY), JSON.stringify(notifications));
   }catch(error){
     console.error('Could not update notification status.', error);
     toast('Notification could not be updated');
@@ -555,6 +562,13 @@ function getSignedInEmail(){
   }
 }
 
+function requireSignedIn(message='Please sign in to continue.'){
+  if(getSignedInEmail()) return true;
+  toast(message);
+  renderSignInModal();
+  return false;
+}
+
 function updateSignInButton(){
   const signedInEmail = getSignedInEmail();
   document.querySelectorAll('[data-modal="signin"], [data-modal="signout"]').forEach(button=>{
@@ -565,6 +579,7 @@ function updateSignInButton(){
 }
 
 function loadCollection(){
+  if(!getSignedInEmail()) return [];
   try{
     const raw = localStorage.getItem(accountStorageKey('joyTrinkets_collection'));
     const collection = raw ? JSON.parse(raw) : [];
@@ -577,6 +592,10 @@ function loadCollection(){
   }
 }
 function saveCollection(collection){
+  if(!getSignedInEmail()){
+    toast('Sign in before saving changes to your Collection');
+    return false;
+  }
   try{
     localStorage.setItem(accountStorageKey('joyTrinkets_collection'), JSON.stringify(collection));
     return true;
@@ -595,6 +614,10 @@ function addToCart(p){
   toast(`${p.name} added to cart`);
 }
 function addPulledFigureToCart(poolItem, pullId, offerExpiresAt){
+  if(!getSignedInEmail()){
+    requireSignedIn('Sign in to save this Box Pull reservation to your account');
+    return false;
+  }
   if(!Number.isFinite(Number(offerExpiresAt)) || offerExpiresAt <= Date.now()) return false;
   const reservationId = `pull-${pullId}`;
   if(cart.some(line=>line.id === reservationId)) return true;
@@ -630,6 +653,10 @@ function isPullOfferExpired(line){
   return Boolean(line.isBoxPull) && (!Number.isFinite(expiresAt) || expiresAt <= Date.now());
 }
 function addPurchasedItemsToCollection(lines){
+  if(!getSignedInEmail()){
+    toast('Sign in before syncing purchases to your Collection');
+    return false;
+  }
   let collection;
   const storageKey = accountStorageKey('joyTrinkets_collection');
   try{
@@ -1036,8 +1063,9 @@ function tradeKey(entry){
 }
 
 function loadTradeListings(){
+  if(!getSignedInEmail()) return [];
   try{
-    const raw = localStorage.getItem(TRADE_LISTINGS_STORAGE_KEY);
+    const raw = localStorage.getItem(accountStorageKey(TRADE_LISTINGS_STORAGE_KEY));
     if(!raw) return [];
     const stored = JSON.parse(raw);
     if(!Array.isArray(stored)) throw new Error('Saved trade listings are not a list.');
@@ -1062,8 +1090,9 @@ function loadTradeListings(){
 }
 
 function saveTradeListings(listings){
+  if(!getSignedInEmail()) return false;
   try{
-    localStorage.setItem(TRADE_LISTINGS_STORAGE_KEY, JSON.stringify(listings));
+    localStorage.setItem(accountStorageKey(TRADE_LISTINGS_STORAGE_KEY), JSON.stringify(listings));
     return true;
   }catch(error){
     console.error('Could not save marketplace listings.', error);
@@ -1073,8 +1102,9 @@ function saveTradeListings(listings){
 }
 
 function loadTradeOffers(){
+  if(!getSignedInEmail()) return [];
   try{
-    const raw = localStorage.getItem(TRADE_OFFERS_STORAGE_KEY);
+    const raw = localStorage.getItem(accountStorageKey(TRADE_OFFERS_STORAGE_KEY));
     if(!raw) return [];
     const stored = JSON.parse(raw);
     if(!Array.isArray(stored)) throw new Error('Saved trade offers are not a list.');
@@ -1099,8 +1129,9 @@ function loadTradeOffers(){
 }
 
 function saveTradeOffers(offers){
+  if(!getSignedInEmail()) return false;
   try{
-    localStorage.setItem(TRADE_OFFERS_STORAGE_KEY, JSON.stringify(offers));
+    localStorage.setItem(accountStorageKey(TRADE_OFFERS_STORAGE_KEY), JSON.stringify(offers));
     return true;
   }catch(error){
     console.error('Could not save trade offers.', error);
@@ -1114,6 +1145,7 @@ function createHubWaybill(){
 }
 
 function ensureSeedIncomingOffer(listing){
+  if(!getSignedInEmail()) return;
   if(!listing.ownerPurchaseId) return;
   const offers = loadTradeOffers();
   if(offers.some(offer=>offer.listingId === listing.id && offer.direction === 'incoming')) return;
@@ -1140,8 +1172,9 @@ function ensureSeedIncomingOffer(listing){
 }
 
 function loadTradeDeals(){
+  if(!getSignedInEmail()) return [];
   try{
-    const raw = localStorage.getItem(TRADE_DEALS_STORAGE_KEY);
+    const raw = localStorage.getItem(accountStorageKey(TRADE_DEALS_STORAGE_KEY));
     if(!raw) return [];
     const stored = JSON.parse(raw);
     if(!Array.isArray(stored)) throw new Error('Saved trade deals are not a list.');
@@ -1174,8 +1207,9 @@ function loadTradeDeals(){
 }
 
 function saveTradeDeals(deals){
+  if(!getSignedInEmail()) return false;
   try{
-    localStorage.setItem(TRADE_DEALS_STORAGE_KEY, JSON.stringify(deals));
+    localStorage.setItem(accountStorageKey(TRADE_DEALS_STORAGE_KEY), JSON.stringify(deals));
     return true;
   }catch(error){
     console.error('Could not save active trade deals.', error);
@@ -1296,6 +1330,7 @@ function collectionOptionLabel(owned){
 }
 
 function renderTradePostModal(){
+  if(!requireSignedIn('Sign in to post a marketplace listing')) return;
   const owned = ownedTradeCharacters();
   const defaultEntry = owned[0] || MARKETPLACE_CHARACTERS[0];
   const figureOptions = MARKETPLACE_CHARACTERS.map(entry=>`<option value="${escAttr(tradeKey(entry))}">${escAttr(entry.character.name)} · ${escAttr(entry.product.series)} — Catalog</option>`).join('');
@@ -1342,6 +1377,7 @@ function renderTradePostModal(){
   });
   form.addEventListener('submit', event=>{
     event.preventDefault();
+    if(!requireSignedIn('Sign in to post a marketplace listing')) return;
     const entry = MARKETPLACE_BY_KEY.get(figureSelect.value);
     const conditions = [...form.querySelectorAll('[name="conditions"]:checked')].map(input=>input.value);
     if(!entry || !conditions.length){
@@ -1386,6 +1422,7 @@ function renderTradePostModal(){
 }
 
 function updateOfferStatus(offerId, status){
+  if(!getSignedInEmail()) return null;
   const offers = loadTradeOffers();
   const offer = offers.find(item=>item.id === offerId);
   if(!offer || offer.status !== 'pending') return null;
@@ -1422,6 +1459,7 @@ function createApprovedDeal(offer, listing){
 }
 
 function approveOffer(offerId){
+  if(!requireSignedIn('Sign in to manage trade offers')) return;
   const offers = loadTradeOffers();
   const offer = offers.find(item=>item.id === offerId && item.status === 'pending');
   if(!offer) return;
@@ -1465,6 +1503,7 @@ function approveOffer(offerId){
 }
 
 function declineOffer(offerId){
+  if(!requireSignedIn('Sign in to manage trade offers')) return;
   const offer = updateOfferStatus(offerId, 'declined');
   if(!offer) return;
   const message = offer.direction === 'incoming' ? 'Incoming offer declined' : 'Your offer was declined';
@@ -1474,6 +1513,7 @@ function declineOffer(offerId){
 }
 
 function simulateSellerApproval(offerId){
+  if(!requireSignedIn('Sign in to manage trade offers')) return;
   const offers = loadTradeOffers();
   const offer = offers.find(item=>item.id === offerId && item.direction === 'sent' && item.status === 'pending');
   if(!offer) return;
@@ -1504,6 +1544,7 @@ function simulateSellerApproval(offerId){
 }
 
 function removeOwnListing(listingId){
+  if(!requireSignedIn('Sign in to manage marketplace listings')) return;
   const listings = loadTradeListings();
   const listing = listings.find(item=>item.id === listingId && item.owner);
   if(!listing) return;
@@ -1534,6 +1575,7 @@ function updateShippingCountdowns(){
 }
 
 function renderTradeOffers(){
+  if(!getSignedInEmail()) return;
   const incomingHost = document.getElementById('incomingOffers');
   const sentHost = document.getElementById('sentOffers');
   if(!incomingHost || !sentHost) return;
@@ -1587,6 +1629,11 @@ function openTradeTab(tabName, dealId=''){
   document.querySelectorAll('[data-trade-panel]').forEach(panel=>{
     panel.hidden = panel.dataset.tradePanel !== tabName;
   });
+  if(['offers', 'deals'].includes(tabName) && !getSignedInEmail()){
+    const panel = document.querySelector(`[data-trade-panel="${tabName}"]`);
+    panel.innerHTML = `<div class="trade-auth-prompt"><h3>Sign in to manage offers and escrow deals</h3><p>Your listings, offers, and active deal details are private to your account.</p><button class="btn btn-primary" type="button" data-modal="signin">Sign in / Create Account</button></div>`;
+    return;
+  }
   if(tabName === 'offers') renderTradeOffers();
   if(tabName === 'deals'){
     renderTradeDeals();
@@ -1610,6 +1657,7 @@ function tradeOfferFormState(body){
 }
 
 function renderTradeProposalModal(listingId, restoredState={}){
+  if(!requireSignedIn('Sign in to propose a trade or purchase')) return;
   const listing = allTradeListings().find(item=>item.id === listingId);
   const entry = listing && tradeCharacter(listing.productName, listing.characterId);
   if(!listing || !entry){
@@ -1718,6 +1766,7 @@ function renderTradeProposalModal(listingId, restoredState={}){
   }
   form.addEventListener('submit', event=>{
     event.preventDefault();
+    if(!requireSignedIn('Sign in to send a trade or purchase offer')) return;
     const fullPayment = Boolean(fullBuy && fullBuy.checked);
     const offeredIds = [...form.querySelectorAll('[name="offered"]:checked')].map(input=>input.value);
     const currentOwned = ownedTradeCharacters();
@@ -1812,6 +1861,7 @@ function transferTradeDealToCollection(deal){
 }
 
 function renderTradeDeals(){
+  if(!getSignedInEmail()) return;
   const host = document.getElementById('tradeDeals');
   if(!host) return;
   const deals = loadTradeDeals();
@@ -1836,6 +1886,7 @@ function renderTradeDeals(){
     </article>`;
   }).join('');
   host.querySelectorAll('[data-trade-next]').forEach(button=>button.addEventListener('click', ()=>{
+    if(!requireSignedIn('Sign in to manage active escrow deals')) return;
     const updated = loadTradeDeals();
     const deal = updated.find(item=>item.id === button.dataset.tradeNext);
     if(!deal || deal.stage >= 5) return;
@@ -1917,8 +1968,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
     if(event.key === 'joytrinkets_user'){
       location.reload();
     }
-    if(event.key === NOTIFICATIONS_STORAGE_KEY) renderNotifications();
-    if(event.key === TRADE_OFFERS_STORAGE_KEY){
+    if(event.key && event.key.startsWith(`${NOTIFICATIONS_STORAGE_KEY}_`)) renderNotifications();
+    if(event.key && event.key.startsWith(`${TRADE_OFFERS_STORAGE_KEY}_`)){
       updatePendingOfferBadge();
       renderTradeOffers();
       renderTradeListings();
@@ -1987,6 +2038,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
   if(checkoutItems){
     const checkoutLayout = document.getElementById('checkoutLayout');
     const checkoutEmpty = document.getElementById('checkoutEmpty');
+    const checkoutAuthPrompt = document.getElementById('checkoutAuthPrompt');
     const orderConfirmation = document.getElementById('orderConfirmation');
     const checkoutForm = document.getElementById('checkoutForm');
     const checkoutOfferWarning = document.getElementById('checkoutOfferWarning');
@@ -2024,6 +2076,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
     regionSelect.addEventListener('change', renderCheckoutSummary);
 
     function renderCheckoutSummary(){
+      const signedIn = Boolean(getSignedInEmail());
+      if(checkoutAuthPrompt) checkoutAuthPrompt.hidden = signedIn;
+      if(!signedIn){
+        checkoutLayout.hidden = true;
+        checkoutEmpty.hidden = true;
+        return;
+      }
       const itemCount = cartItemCount();
       const subtotal = cartTotal();
       const discount = itemCount >= BUNDLE_DISCOUNT_THRESHOLD ? Math.round(subtotal * BUNDLE_DISCOUNT_RATE) : 0;
@@ -2098,6 +2157,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
     renderCheckoutSummary();
     checkoutForm.addEventListener('submit', event=>{
       event.preventDefault();
+      if(!requireSignedIn('Sign in before placing your order')) return;
       if(!checkoutForm.reportValidity() || cartItemCount() === 0) return;
       if(!validateMobile()) return;
       if(cart.some(isPullOfferExpired)){
@@ -2608,6 +2668,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
   /* ---- Page: shelf.html ---- */
   const shelfRow = document.getElementById('shelfRow');
   if(shelfRow){
+    const signedIn = Boolean(getSignedInEmail());
+    const shelfAuthPrompt = document.getElementById('shelfAuthPrompt');
+    const shelfCollection = document.getElementById('shelfCollection');
+    if(shelfAuthPrompt) shelfAuthPrompt.hidden = signedIn;
+    if(shelfCollection) shelfCollection.hidden = !signedIn;
+    if(!signedIn) return;
     const collection = loadCollection();
     const ownedCount = collection.reduce((total,item)=> total + item.qty, 0);
     const ownedSeries = new Set(collection
@@ -2683,6 +2749,10 @@ document.addEventListener('DOMContentLoaded', ()=>{
     renderTradeListings();
     renderTradeDeals();
     renderTradeOffers();
+    document.querySelectorAll('[data-trade-tab="offers"], [data-trade-tab="deals"]').forEach(button=>{
+      button.classList.toggle('trade-tab-locked', !getSignedInEmail());
+      button.title = getSignedInEmail() ? '' : 'Sign in to manage offers and escrow deals';
+    });
     updateShippingCountdowns();
     setInterval(updateShippingCountdowns, 60000);
     document.querySelectorAll('[data-trade-filter]').forEach(button=>button.addEventListener('click', ()=>{
@@ -2694,7 +2764,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
       renderTradeListings(button.dataset.tradeFilter);
     }));
     document.querySelectorAll('[data-trade-tab]').forEach(button=>button.addEventListener('click', ()=>openTradeTab(button.dataset.tradeTab)));
-    document.querySelector('[data-trade-post]').addEventListener('click', renderTradePostModal);
+    document.querySelector('[data-trade-post]').addEventListener('click', ()=>renderTradePostModal());
     if(location.hash === '#offers') openTradeTab('offers');
     else if(location.hash.startsWith('#deals-')) openTradeTab('deals', location.hash.slice(7));
   }

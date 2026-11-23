@@ -1386,16 +1386,8 @@ function renderTradeDeals(){
   }));
 }
 
-function renderRaffleModal(){
-  openModal(`
-    <h3>Chase e-raffle details</h3>
-    <p class="modal-sub">Raffle entries, eligible catalog figures, and draw timing are confirmed by the Joy Trinkets team in-store. No entry or payment is submitted by this demo.</p>
-    <button class="btn btn-mint" id="raffleDone" style="width:100%; justify-content:center;">Got it</button>`);
-  document.getElementById('modalBody').querySelector('#raffleDone').addEventListener('click', closeModal);
-}
-
 const INFO_CONTENT = {
-  rules: ['Fair drop rules', 'Every limited release runs through anti-bot verification. One account, one entry, winners drawn live and logged for transparency.'],
+  rules: ['Fair drop rules', 'Every limited release runs through anti-bot verification and clear eligibility rules to ensure fair access.'],
   sell: ['Sell on Joy Trinkets', 'Independent toy designers can apply for a storefront with built-in anti-bot drop tools and IP protection. Applications open soon.'],
   antibot: ['Anti-bot drop tools', 'Every checkout for a limited drop is screened for automated behavior before an order is allowed to go through.'],
   contact: ['Contact us', 'Reach the Joy Trinkets team anytime at hello@joytrinkets.example — this is a demo project, so this inbox is not monitored.'],
@@ -1650,7 +1642,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
       if(document.getElementById('pullTray')) location.reload();
     }
     else if(type === 'catalog') renderCatalogModal();
-    else if(type === 'raffle') renderRaffleModal();
     else renderInfoModal(type);
   });
 
@@ -2073,16 +2064,5 @@ document.addEventListener('DOMContentLoaded', ()=>{
       if(button.dataset.tradeTab === 'deals') renderTradeDeals();
     }));
     document.querySelector('[data-trade-post]').addEventListener('click', renderTradePostModal);
-  }
-  if(document.getElementById('tHrs')){
-    let totalSecs = 4*3600 + 26*60 + 51;
-    function pad(n){ return n.toString().padStart(2,'0'); }
-    setInterval(()=>{
-      if(totalSecs <= 0) return;
-      totalSecs--;
-      document.getElementById('tHrs').textContent = pad(Math.floor(totalSecs/3600));
-      document.getElementById('tMin').textContent = pad(Math.floor((totalSecs%3600)/60));
-      document.getElementById('tSec').textContent = pad(totalSecs%60);
-    }, 1000);
   }
 });

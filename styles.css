@@ -310,10 +310,9 @@ nav{display:flex; align-items:center; justify-content:space-between; padding:18p
 .feature-list p{font-size:14px; color:var(--muted);}
 
 /* ---------- Trade ---------- */
-.trade-grid{display:grid; grid-template-columns:minmax(0,1.55fr) minmax(270px,.65fr); gap:24px; align-items:start;}
+.trade-grid{display:grid; grid-template-columns:minmax(0,1fr); gap:24px; align-items:start;}
 @media(max-width:900px){.trade-grid{grid-template-columns:1fr;}}
 .trade-card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:26px;}
-.trade-card.accent{background:linear-gradient(160deg, #FFE9F0, #FFFFFF); border-color:var(--border-strong);}
 .trade-marketplace{min-width:0;}
 .trade-marketplace-heading{display:flex;justify-content:space-between;align-items:center;gap:18px;margin-bottom:20px;}
 .trade-marketplace-heading h3{font-size:21px;margin:0 0 5px;}
@@ -345,8 +344,6 @@ nav{display:flex; align-items:center; justify-content:space-between; padding:18p
 .trade-empty,.trade-empty-inline{padding:22px;border:1px dashed var(--border-strong);border-radius:13px;color:var(--muted);font-size:13px;}
 .trade-empty b,.trade-empty span{display:block;}
 .trade-empty span{margin-top:5px;}
-.trade-card.accent .kicker{color:#7A5CE0;}
-.trade-card.accent .raffle-timer{margin:20px 0;}
 .trade-form-panel h3,.trade-proposal h3{margin:5px 35px 7px 0;}
 .trade-form-panel form{display:grid;gap:13px;}
 .trade-field{display:grid;gap:6px;font-size:12px;font-weight:700;}
@@ -399,10 +396,6 @@ nav{display:flex; align-items:center; justify-content:space-between; padding:18p
 .trade-stage-list li.current>b,.trade-stage-list li.current{color:var(--ink);}
 .trade-stage-list li small{display:block;color:var(--muted);margin-top:3px;}
 .escrow-badge{font-size:10.5px; font-weight:700; color:#0FA983; background:#E1F9F1; padding:4px 9px; border-radius:6px;}
-.raffle-timer{display:flex; gap:10px; margin:20px 0;}
-.timer-box{background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 0; flex:1; text-align:center;}
-.timer-box b{font-family:'Fredoka',sans-serif; font-size:20px; display:block;}
-.timer-box span{font-size:11px; color:var(--muted);}
 @media(max-width:700px){.trade-listing-grid{grid-template-columns:1fr 1fr;}.trade-marketplace-heading{align-items:flex-start;flex-direction:column;}.trade-proposal-columns{grid-template-columns:1fr;}}
 @media(max-width:480px){.trade-listing-grid{grid-template-columns:1fr;}.trade-card{padding:18px;}.trade-listing-photo{height:280px;}.trade-target-photo{height:280px;}.trade-deal-summary{flex-wrap:wrap;}.trade-deal-status{margin-left:70px;}}
 

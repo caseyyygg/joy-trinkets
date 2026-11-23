@@ -73,6 +73,11 @@ function hasCharacterModel(name){
   return Boolean(registeredCharacterModel(name)?.url);
 }
 
+function accountStorageKey(namespace, accountId=getSignedInEmail()){
+  const normalizedId = String(accountId || '').trim().toLowerCase();
+  return `${namespace}_${normalizedId ? encodeURIComponent(normalizedId) : 'guest'}`;
+}
+
 function characterModelData(name, modelUrl='', modelOrientation={}){
   const id = characterId(name);
   const {url, ...registryOrientation} = registeredCharacterModel(name) || {};
@@ -463,8 +468,9 @@ const COMMUNITY_LISTINGS = COMMUNITY_CANDIDATES.slice(0, COMMUNITY_SELLERS.lengt
 /* ================= Cart (persisted across pages) ================= */
 function loadCart(){
   let stored;
+  const storageKey = accountStorageKey('joyTrinkets_cart');
   try{
-    const raw = localStorage.getItem('joytrinkets_cart');
+    const raw = localStorage.getItem(storageKey);
     stored = raw ? JSON.parse(raw) : [];
   }catch(error){
     console.error('Could not read the cart.', error);
@@ -487,7 +493,7 @@ function loadCart(){
   });
   if(updated){
     try{
-      localStorage.setItem('joytrinkets_cart', JSON.stringify(loaded));
+      localStorage.setItem(storageKey, JSON.stringify(loaded));
     }catch(error){
       console.error('Could not migrate the saved cart.', error);
       toast('Your saved cart could not be updated');
@@ -497,7 +503,7 @@ function loadCart(){
 }
 function saveCart(){
   try{
-    localStorage.setItem('joytrinkets_cart', JSON.stringify(cart));
+    localStorage.setItem(accountStorageKey('joyTrinkets_cart'), JSON.stringify(cart));
     return true;
   }catch(error){
     console.error('Could not save the cart.', error);
@@ -560,7 +566,7 @@ function updateSignInButton(){
 
 function loadCollection(){
   try{
-    const raw = localStorage.getItem('joytrinkets_collection');
+    const raw = localStorage.getItem(accountStorageKey('joyTrinkets_collection'));
     const collection = raw ? JSON.parse(raw) : [];
     if(raw && !Array.isArray(collection)) console.error('The saved collection is not a valid list.');
     return Array.isArray(collection) ? collection : [];
@@ -572,7 +578,7 @@ function loadCollection(){
 }
 function saveCollection(collection){
   try{
-    localStorage.setItem('joytrinkets_collection', JSON.stringify(collection));
+    localStorage.setItem(accountStorageKey('joyTrinkets_collection'), JSON.stringify(collection));
     return true;
   }catch(error){
     console.error('Could not save the collection.', error);
@@ -607,6 +613,7 @@ function addPulledFigureToCart(poolItem, pullId, offerExpiresAt){
     price:poolItem.price,
     qty:1,
     offerExpiresAt,
+    accountId:getSignedInEmail().trim().toLowerCase(),
     modelUrl:poolItem.character.modelUrl,
     modelOrientation:poolItem.character.modelOrientation,
   });
@@ -624,8 +631,9 @@ function isPullOfferExpired(line){
 }
 function addPurchasedItemsToCollection(lines){
   let collection;
+  const storageKey = accountStorageKey('joyTrinkets_collection');
   try{
-    const raw = localStorage.getItem('joytrinkets_collection');
+    const raw = localStorage.getItem(storageKey);
     const stored = raw ? JSON.parse(raw) : [];
     if(!Array.isArray(stored)) throw new Error('Saved collection data is not a list.');
     collection = stored;
@@ -986,7 +994,7 @@ function renderSignInModal(){
     closeModal();
     updateSignInButton();
     toast('Signed in (demo)');
-    if(document.getElementById('pullTray')) location.reload();
+    location.reload();
   });
   body.querySelector('#signupLink').addEventListener('click', ()=> toast('Sign-up flow coming soon'));
 }
@@ -1744,7 +1752,7 @@ function transferTradeDealToCollection(deal){
   const transferId = `trade-${deal.id}`;
   let collection;
   try{
-    const raw = localStorage.getItem('joytrinkets_collection');
+    const raw = localStorage.getItem(accountStorageKey('joyTrinkets_collection'));
     const stored = raw ? JSON.parse(raw) : [];
     if(!Array.isArray(stored)) throw new Error('Saved collection data is not a list.');
     collection = stored;
@@ -1906,6 +1914,9 @@ document.addEventListener('DOMContentLoaded', ()=>{
     });
   });
   window.addEventListener('storage', event=>{
+    if(event.key === 'joytrinkets_user'){
+      location.reload();
+    }
     if(event.key === NOTIFICATIONS_STORAGE_KEY) renderNotifications();
     if(event.key === TRADE_OFFERS_STORAGE_KEY){
       updatePendingOfferBadge();
@@ -2150,7 +2161,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
       }
       updateSignInButton();
       toast('Signed out');
-      if(document.getElementById('pullTray')) location.reload();
+      location.reload();
     }
     else if(type === 'catalog') renderCatalogModal();
     else renderInfoModal(type);
@@ -2301,7 +2312,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
       }).join('');
       if(pool.length === 0) vaultOdds.innerHTML = '<p class="vault-demo-note">No available figures in this series.</p>';
     }
-    seriesFilter.addEventListener('change', renderOdds);
     renderOdds();
 
     if(!getSignedInEmail()){
@@ -2314,7 +2324,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
       }
       function loadDaily(){
         let daily;
-        try{ daily = JSON.parse(localStorage.getItem('joytrinkets_daily_pull')); }catch(e){ daily = null; }
+        try{ daily = JSON.parse(localStorage.getItem(accountStorageKey('joyTrinkets_pullState'))); }catch(e){ daily = null; }
         if(!daily || daily.date !== todayStr() || !Array.isArray(daily.results)){
           return {date:todayStr(), poolVersion:PULL_POOL_VERSION, results:[]};
         }
@@ -2327,7 +2337,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
       let daily = loadDaily();
       function saveDaily(){
         try{
-          localStorage.setItem('joytrinkets_daily_pull', JSON.stringify(daily));
+          localStorage.setItem(accountStorageKey('joyTrinkets_pullState'), JSON.stringify(daily));
           return true;
         }catch(error){
           console.error('Could not save Box Pull history.', error);
@@ -2356,13 +2366,35 @@ document.addEventListener('DOMContentLoaded', ()=>{
         }
       }
       let offerTimer;
-      function renderResult(pullResult){
+      let activePullId = '';
+      let pendingPull = false;
+      const summary = document.getElementById('pullSummary');
+      function getPoolItem(pullResult){
+        return AVAILABLE_PULL_POOL.find(item=>item.id === pullResult.poolItemId);
+      }
+      function isPullInCart(pullResult){
+        return Boolean(pullResult.addedToCart || cart.some(line=>line.id === `pull-${pullResult.pullId}`));
+      }
+      function visibleResults(){
+        const selectedSeries = seriesFilter.value;
+        if(selectedSeries === 'all') return daily.results;
+        return daily.results.filter(pullResult=>{
+          const item = getPoolItem(pullResult);
+          return item ? item.productName === selectedSeries : pullResult.productName === selectedSeries;
+        });
+      }
+      function renderActiveResult(pullResult){
         clearInterval(offerTimer);
-        const poolItem = AVAILABLE_PULL_POOL.find(item=> item.id === pullResult.poolItemId);
+        if(!pullResult){
+          result.innerHTML = '<span class="placeholder-text">Tap a box to reveal a figure ↖</span>';
+          return;
+        }
+        const poolItem = getPoolItem(pullResult);
         const offerExpiresAt = Number(pullResult.offerExpiresAt) || 0;
         const offerExpired = offerExpiresAt <= Date.now();
         const product = poolItem && poolItem.product;
         const character = poolItem && poolItem.character;
+        const addedToCart = isPullInCart(pullResult);
         const pullOdds = pullResult.poolOddsLabel || '';
         result.innerHTML = `
           <div class="result-figure">${placeholderBox(pullResult.name || 'Unavailable figure', poolItem ? poolItem.image : '')}</div>
@@ -2376,14 +2408,12 @@ document.addEventListener('DOMContentLoaded', ()=>{
           ${product && product.modelPreview && hasCharacterModel(character.name) ? '<button class="btn btn-outline" id="previewPulledFigure" type="button">See 3D Model</button>' : ''}
           ${product ? `
             <p class="vault-offer-countdown" id="vaultOfferCountdown" role="status"></p>
-            <button class="btn btn-primary" id="addPulledFigure" style="margin-top:12px;" ${offerExpired || pullResult.addedToCart ? 'disabled' : ''}>
-              ${pullResult.addedToCart ? 'Added to cart' : `Add to cart · ${peso(poolItem.price)}`}
+            <button class="btn btn-primary" id="addPulledFigure" style="margin-top:12px;" ${offerExpired || addedToCart ? 'disabled' : ''}>
+              ${addedToCart ? 'Added to cart' : `Add to cart · ${peso(poolItem.price)}`}
             </button>` : ''}`;
         const addButton = result.querySelector('#addPulledFigure');
         const previewButton = result.querySelector('#previewPulledFigure');
-        if(previewButton){
-          previewButton.addEventListener('click', ()=>renderModelViewer(product, character.name, character));
-        }
+        if(previewButton) previewButton.addEventListener('click', ()=>renderModelViewer(product, character.name, character));
         const countdown = result.querySelector('#vaultOfferCountdown');
         if(product && countdown){
           const updateOfferCountdown = ()=>{
@@ -2403,48 +2433,138 @@ document.addEventListener('DOMContentLoaded', ()=>{
             if(!updateOfferCountdown()) clearInterval(offerTimer);
           }, 1000);
         }
-        if(addButton) addButton.addEventListener('click', ()=>{
-          if(Date.now() >= offerExpiresAt || pullResult.addedToCart || !poolItem) return;
-          if(!addPulledFigureToCart(poolItem, pullResult.pullId, offerExpiresAt)) return;
-          pullResult.addedToCart = true;
-          saveDaily();
-          addButton.disabled = true;
-          addButton.textContent = 'Added to cart';
-        });
+        if(addButton) addButton.addEventListener('click', ()=>addPullToCart(pullResult));
       }
-      function buildTray(){
+      function renderTray(){
+        const results = visibleResults();
         tray.innerHTML = '';
         for(let i=0;i<DAILY_LIMIT;i++){
+          const pullResult = results[i];
+          const poolItem = pullResult && getPoolItem(pullResult);
           const box = document.createElement('button');
+          box.type = 'button';
           box.className = 'pull-box';
-          if(daily.results[i]){
+          box.dataset.boxIndex = String(i);
+          if(pullResult){
             box.classList.add('opened');
-            box.textContent = '✓';
-            box.disabled = true;
+            if(pullResult.pullId === activePullId) box.classList.add('active');
+            box.setAttribute('aria-pressed', String(pullResult.pullId === activePullId));
+            box.setAttribute('aria-label', `Inspect ${poolItem ? poolItem.name : pullResult.name || 'revealed figure'}`);
+            if(poolItem){
+              box.innerHTML = `<span class="pull-box-card">
+                <span class="pull-box-thumb">${placeholderBox(poolItem.name, poolItem.image)}</span>
+                <span class="pull-box-name">${escAttr(poolItem.name)}</span>
+                <span class="result-rarity ${escAttr(poolItem.rarityClass)}">${escAttr(poolItem.rarity)}</span>
+                <span class="pull-box-price">${peso(poolItem.price)}</span>
+                <span class="pull-box-status">${isPullInCart(pullResult) ? 'In Cart' : 'Reserved · Click to inspect'}</span>
+              </span>`;
+            }else{
+              box.innerHTML = `<span class="pull-box-card"><span class="pull-box-name">${escAttr(pullResult.name || 'Unavailable figure')}</span><span class="pull-box-status">Unavailable to reserve</span></span>`;
+            }
           }else{
-            box.textContent = '?';
+            box.innerHTML = '<span class="pull-box-empty">?</span>';
+            box.setAttribute('aria-label', `Open box ${i + 1}`);
+            box.disabled = daily.results.length >= DAILY_LIMIT || pendingPull;
           }
           tray.appendChild(box);
         }
-        if(daily.results.length > 0) renderResult(daily.results[daily.results.length - 1]);
-        else result.innerHTML = '<span class="placeholder-text">Tap a box in the tray to reveal a figure ↖</span>';
+      }
+      function renderSummary(){
+        if(!summary) return;
+        const pulls = daily.results;
+        summary.hidden = pulls.length < 2;
+        if(summary.hidden) return;
+        const remainingPulls = pulls.filter(pullResult=>
+          getPoolItem(pullResult) && !isPullInCart(pullResult) && Number(pullResult.offerExpiresAt) > Date.now()
+        );
+        const discountRate = Math.round(BUNDLE_DISCOUNT_RATE * 100);
+        summary.innerHTML = `<div class="pull-summary-head"><div><h3>Your Revealed Tray (${pulls.length}/${DAILY_LIMIT})</h3><p>Inspect any pull or add your remaining reservations to cart.</p></div></div>
+          <div class="pull-summary-grid">${pulls.map(pullResult=>{
+            const poolItem = getPoolItem(pullResult);
+            if(!poolItem) return `<article class="pull-summary-card"><span class="pull-box-name">${escAttr(pullResult.name || 'Unavailable figure')}</span><small>Unavailable</small></article>`;
+            const inCart = isPullInCart(pullResult);
+            return `<article class="pull-summary-card">
+              <button class="pull-summary-inspect" type="button" data-inspect-pull="${escAttr(pullResult.pullId)}" aria-label="Inspect ${escAttr(poolItem.name)}">
+                <span class="pull-box-thumb">${placeholderBox(poolItem.name, poolItem.image)}</span>
+                <span class="pull-box-name">${escAttr(poolItem.name)}</span>
+                <span class="result-rarity ${escAttr(poolItem.rarityClass)}">${escAttr(poolItem.rarity)}</span>
+                <span class="pull-box-price">${peso(poolItem.price)}</span>
+              </button>
+              <button class="btn ${inCart ? 'btn-outline' : 'btn-primary'}" type="button" data-add-pull="${escAttr(pullResult.pullId)}" ${inCart || Number(pullResult.offerExpiresAt) <= Date.now() ? 'disabled' : ''}>${inCart ? 'Added ✓' : 'Add to cart'}</button>
+            </article>`;
+          }).join('')}</div>
+          <div class="pull-summary-actions"><small>${pulls.length === DAILY_LIMIT ? `Add all 3 pulls for the ${discountRate}% 3-item bundle discount.` : `${discountRate}% bundle discount applies when your cart has ${BUNDLE_DISCOUNT_THRESHOLD} or more eligible items.`}</small>
+          ${remainingPulls.length ? `<button class="btn btn-primary" type="button" data-add-all-pulls>Add All Remaining to Cart (${remainingPulls.length})</button>` : ''}</div>`;
+        summary.querySelectorAll('[data-inspect-pull]').forEach(button=>button.addEventListener('click', ()=>{
+          const pullResult = daily.results.find(item=>item.pullId === button.dataset.inspectPull);
+          if(pullResult) selectPull(pullResult, true);
+        }));
+        summary.querySelectorAll('[data-add-pull]').forEach(button=>button.addEventListener('click', ()=>{
+          const pullResult = daily.results.find(item=>item.pullId === button.dataset.addPull);
+          if(pullResult) addPullToCart(pullResult);
+        }));
+        const addAllButton = summary.querySelector('[data-add-all-pulls]');
+        if(addAllButton) addAllButton.addEventListener('click', ()=>{
+          for(const pullResult of remainingPulls){
+            if(!addPullToCart(pullResult, false)) break;
+          }
+          refreshPullView();
+        });
+      }
+      function addPullToCart(pullResult, refresh=true){
+        const poolItem = getPoolItem(pullResult);
+        const offerExpiresAt = Number(pullResult.offerExpiresAt) || 0;
+        if(!poolItem || offerExpiresAt <= Date.now() || isPullInCart(pullResult)) return false;
+        if(!addPulledFigureToCart(poolItem, pullResult.pullId, offerExpiresAt)) return false;
+        pullResult.addedToCart = true;
+        if(!saveDaily()) return false;
+        if(refresh) refreshPullView();
+        return true;
+      }
+      function selectPull(pullResult, updateSeries=false){
+        const poolItem = getPoolItem(pullResult);
+        if(updateSeries && poolItem && seriesFilter.value !== 'all' && seriesFilter.value !== poolItem.productName){
+          seriesFilter.value = poolItem.productName;
+          renderOdds();
+        }
+        activePullId = pullResult.pullId;
+        renderActiveResult(pullResult);
+        renderTray();
+      }
+      function refreshPullView(){
+        const visible = visibleResults();
+        const active = visible.find(item=>item.pullId === activePullId) || visible[visible.length - 1] || null;
+        activePullId = active ? active.pullId : '';
+        renderActiveResult(active);
+        renderTray();
+        renderSummary();
+      }
+      function buildTray(){
+        refreshPullView();
         updateCountText();
       }
       tray.addEventListener('click', event=>{
         const box = event.target.closest('.pull-box');
-        if(!box || box.disabled || daily.results.length >= DAILY_LIMIT) return;
+        if(!box) return;
+        const index = Number(box.dataset.boxIndex);
+        const results = visibleResults();
+        if(results[index]){
+          selectPull(results[index]);
+          return;
+        }
+        if(box.disabled || pendingPull || daily.results.length >= DAILY_LIMIT) return;
+        const selectedSeries = seriesFilter.value;
         const pool = getFilteredPool();
         const totalWeight = pool.reduce((total,item)=> total + item.weight, 0);
         if(!totalWeight){
           toast('No available figures in this pool');
           return;
         }
-        box.disabled = true;
+        pendingPull = true;
+        tray.querySelectorAll('.pull-box:not(.opened)').forEach(item=>{item.disabled = true;});
         box.classList.add('shaking');
         setTimeout(()=>{
-          box.classList.remove('shaking');
-          box.classList.add('opened');
-          box.textContent = '✓';
+          pendingPull = false;
           const roll = Math.random() * totalWeight;
           let cumulativeWeight = 0;
           const picked = pool.find(item=>{
@@ -2454,16 +2574,23 @@ document.addEventListener('DOMContentLoaded', ()=>{
           const pullResult = {
             pullId:createLocalId('pull'),
             poolItemId:picked.id,
+            productName:picked.productName,
             name:picked.name,
             rarity:picked.rarity,
             poolOddsLabel:`${(picked.weight / totalWeight * 100).toFixed(2)}%`,
             offerExpiresAt:Date.now() + PULL_OFFER_DURATION,
           };
           daily.results.push(pullResult);
+          activePullId = pullResult.pullId;
           saveDaily();
-          renderResult(pullResult);
+          if(seriesFilter.value !== selectedSeries) seriesFilter.value = selectedSeries;
+          refreshPullView();
           updateCountText();
         }, 500);
+      });
+      seriesFilter.addEventListener('change', ()=>{
+        renderOdds();
+        refreshPullView();
       });
       setInterval(()=>{
         if(daily.date !== todayStr()){

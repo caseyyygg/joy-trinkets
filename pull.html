@@ -51,7 +51,7 @@
     <div class="pull-head">
       <span class="kicker">Digital box pull</span>
       <h2>Reveal an available in-store figure</h2>
-      <p style="color:var(--muted); margin-top:12px;">Open up to three boxes a day from figures currently available in our catalog. See the exact character, photo, odds, and price before deciding to buy. Each reservation lasts 30 minutes and nothing is charged until checkout.</p>
+      <p style="color:var(--muted); margin-top:12px;">Open up to three boxes a day from figures currently available in our catalog. Your daily tray and reveals are saved to your signed-in account. See the exact character, photo, odds, and price before deciding to buy. Each reservation lasts 30 minutes and nothing is charged until checkout.</p>
     </div>
     <div class="pull-auth-prompt" id="pullSignInPrompt" hidden>
       <h3>Sign in to pull a box</h3>
@@ -66,10 +66,11 @@
         </select>
       </div>
       <div class="pull-tray" id="pullTray"></div>
-      <div>
+      <div class="pull-reveal-column">
         <div class="pull-result" id="pullResult">
           <span class="placeholder-text">Tap a box in the tray to pull ↖</span>
         </div>
+        <section class="pull-summary" id="pullSummary" aria-live="polite" hidden></section>
         <p class="pull-count" id="pullCount">0 of 3 boxes opened today</p>
       </div>
     </div>

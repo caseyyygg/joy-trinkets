@@ -205,9 +205,8 @@ nav{display:flex; align-items:center; justify-content:space-between; padding:18p
 .product-view-cue{font-size:12px; font-weight:600; color:var(--coral-dark); margin:-7px 0 12px;}
 .product-foot{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:auto; padding-top:11px; border-top:1px solid var(--border);}
 .price{font-family:'Fredoka',sans-serif; font-size:16px;}
-.add-btn{min-height:38px; padding:0 13px; border-radius:999px; background:var(--ink); color:#fff; border:none; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; white-space:nowrap; transition:background .15s ease;}
-.add-btn:hover{background:var(--coral);}
-.add-btn:disabled{background:#DCD6DA; color:#8C7B87;}
+.product-select-link,.catalog-select-btn{padding:5px 0;border:0;background:transparent;color:var(--coral-dark);font-size:12px;font-weight:700;white-space:nowrap;}
+.product-select-link:hover,.catalog-select-btn:hover{text-decoration:underline;}
 .drop-more{display:flex; justify-content:center; margin-top:40px;}
 
 /* Branded fallback for product photos that fail to load. */
@@ -360,7 +359,9 @@ nav{display:flex; align-items:center; justify-content:space-between; padding:18p
 .trade-form-panel legend,.trade-proposal-offer legend{font-size:12px;font-weight:700;margin-bottom:7px;}
 .trade-check-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
 .trade-check-grid label,.trade-check{font-size:12px;font-weight:500;color:var(--ink);}
-.trade-check{display:flex;align-items:flex-start;gap:8px;}
+.trade-check-grid label{display:flex;align-items:center;gap:8px;}
+.trade-check{display:flex;align-items:center;gap:8px;}
+.trade-check-grid input[type="checkbox"],.trade-check input[type="checkbox"],.trade-offer-item input[type="checkbox"]{flex:0 0 18px;width:18px;height:18px;min-height:18px;margin:0;padding:0;accent-color:var(--coral);}
 .trade-proposal-columns{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:22px;}
 .trade-proposal-target,.trade-proposal-offer{padding:16px;border:1px solid var(--border);border-radius:14px;background:var(--surface-2);min-width:0;}
 .trade-proposal-target h4,.trade-proposal-offer h4{font-size:15px;margin-bottom:10px;}
@@ -370,10 +371,14 @@ nav{display:flex; align-items:center; justify-content:space-between; padding:18p
 .trade-proposal-target>p{font-size:12px;color:var(--muted);margin:6px 0;}
 .trade-proposal-offer{display:grid;align-content:start;gap:12px;}
 .trade-offer-list{display:grid;gap:7px;max-height:180px;overflow:auto;}
-.trade-offer-item{display:flex;align-items:center;gap:8px;padding:9px;border:1px solid var(--border);border-radius:9px;background:#fff;font-size:11px;}
-.trade-offer-item>span{flex:1;min-width:0;}
-.trade-offer-item small{display:block;color:var(--muted);margin-top:3px;}
-.trade-offer-item>b{white-space:nowrap;}
+.trade-offer-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:9px;background:#fff;font-size:11px;}
+.trade-offer-item input[type="checkbox"]{flex-shrink:0;}
+.trade-offer-thumb{display:block;flex:0 0 40px;width:40px;height:40px;overflow:hidden;border-radius:8px;background:var(--surface-2);}
+.trade-offer-thumb>.product-photo,.trade-offer-thumb>img,.trade-offer-thumb>.img-placeholder{width:100%;height:100%;object-fit:contain;border:0;border-radius:8px;padding:2px;}
+.trade-offer-copy{display:flex;flex:1;flex-direction:column;min-width:0;line-height:1.35;}
+.trade-offer-copy strong{font-size:12px;font-weight:700;white-space:normal;overflow-wrap:anywhere;}
+.trade-offer-item small{display:block;color:var(--muted);margin-top:3px;font-size:10px;line-height:1.35;white-space:normal;overflow-wrap:anywhere;}
+.trade-offer-item>.trade-offer-price{flex-shrink:0;text-align:right;white-space:nowrap;}
 .trade-empty-inline{padding:12px;font-size:11px;}
 .trade-escrow-breakdown{display:grid;gap:6px;padding:12px;border-radius:10px;background:#e8f7f1;font-size:11px;}
 .trade-escrow-breakdown>span{display:flex;justify-content:space-between;gap:8px;}

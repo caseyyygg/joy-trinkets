@@ -673,7 +673,7 @@ function renderCharacterModal(product, index=0){
         <h4>${escAttr(character.name)}</h4><span class="rarity-badge ${character.rarity === 'Secret Chase' ? 'rarity-secret' : 'rarity-common'}">${escAttr(character.rarity)}</span>
         <p>Pull odds <b>${escAttr(character.odds)}</b> <span class="character-height">· ${figureHeightText(product.heightCm)}</span></p>
         <div class="character-thumbnails" aria-label="Choose a character">${product.characters.map((item, itemIndex)=>`<button type="button" class="character-thumb ${itemIndex === activeCharacterIndex ? 'active' : ''}" data-character-index="${itemIndex}" aria-label="View ${escAttr(item.name)}">${placeholderBox(item.name, item.image)}</button>`).join('')}</div>
-        <div class="character-actions"><button class="btn btn-primary" type="button" data-character-add ${product.tag === 'tag-soldout' ? 'disabled' : ''}>Add Blind Box to Cart</button>${product.modelPreview && hasCharacterModel(character.name) ? `<button class="btn btn-outline" type="button" data-model-preview data-character-id="${escAttr(character.id)}" data-character-name="${escAttr(character.name)}">See 3D Model</button>` : ''}</div>
+        <div class="character-actions"><button class="btn btn-primary" type="button" data-character-add ${product.tag === 'tag-soldout' ? 'disabled' : ''}>Add Blind Box to Cart · ${peso(product.price)}</button>${product.modelPreview && hasCharacterModel(character.name) ? `<button class="btn btn-outline" type="button" data-model-preview data-character-id="${escAttr(character.id)}" data-character-name="${escAttr(character.name)}">See 3D Model</button>` : ''}</div>
       </div>
     </div>`);
   const body = document.getElementById('modalBody');
@@ -922,14 +922,14 @@ function renderCatalogModal(){
     <div class="modal-list-item">
       <div style="width:44px;height:44px;border-radius:8px;background:var(--surface-2); flex-shrink:0; overflow:hidden; display:flex; align-items:center; justify-content:center;">${p.image ? `<img src="${escAttr(p.image)}" alt="${escAttr(p.name)}" style="width:100%; height:100%; object-fit:cover;" onerror="imgFallback(this)">` : ''}</div>
       <div class="listing-info" style="flex:1;"><b>${p.name}</b><span>${p.series} · ${peso(p.price)}</span></div>
-      <button class="add-btn" style="width:32px;height:32px;font-size:15px;" ${p.tag==='tag-soldout'?'disabled':''} data-add="${p.name}">+</button>
+      <button class="catalog-select-btn" type="button" data-select-series="${escAttr(p.name)}">View →</button>
     </div>`).join('');
   openModal(`<h3>Full catalog</h3><p class="modal-sub">${PRODUCTS.length} figures across 6 categories.</p>${rows}`);
   const body = document.getElementById('modalBody');
-  body.querySelectorAll('[data-add]').forEach(btn=>{
+  body.querySelectorAll('[data-select-series]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
-      const p = PRODUCTS.find(x=> x.name === btn.dataset.add);
-      if(p) addToCart(p);
+      const p = PRODUCTS.find(x=> x.name === btn.dataset.selectSeries);
+      if(p) renderCharacterModal(p);
     });
   });
 }
@@ -964,9 +964,10 @@ function loadTradeListings(){
       return entry && ['trade', 'sale', 'trade-or-buy'].includes(listing.type);
     }).map(listing=>{
       const entry = tradeCharacter(listing.productName, listing.characterId);
+      const savedAskPrice = Number(listing.askPrice);
       return {
         ...listing,
-        askPrice:entry.product.price,
+        askPrice:Number.isFinite(savedAskPrice) && savedAskPrice > 0 ? savedAskPrice : entry.product.price,
         conditions:Array.isArray(listing.conditions) ? listing.conditions.filter(item=>TRADE_CONDITIONS.includes(item)) : [],
         isoIds:Array.isArray(listing.isoIds) ? listing.isoIds.filter(key=>MARKETPLACE_BY_KEY.has(key)) : [],
       };
@@ -995,16 +996,26 @@ function loadTradeDeals(){
     if(!raw) return [];
     const stored = JSON.parse(raw);
     if(!Array.isArray(stored)) throw new Error('Saved trade deals are not a list.');
+    const listingById = new Map([...COMMUNITY_LISTINGS, ...loadTradeListings()].map(listing=>[listing.id, listing]));
     return stored.filter(deal=>typeof deal.id === 'string' && tradeCharacter(deal.productName, deal.characterId))
-      .map(deal=>({
-        ...deal,
-        stage:Math.floor(Math.max(0, Math.min(5, Number(deal.stage) || 0))),
-        cash:Math.max(0, Number(deal.cash) || 0),
-        delivery:deal.delivery === 'dropoff' ? 'dropoff' : 'courier',
-        offered:Array.isArray(deal.offered) ? deal.offered.filter(item=>
-          item && typeof item.purchaseId === 'string' && tradeCharacter(item.productName, item.characterId)
-        ) : [],
-      }));
+      .map(deal=>{
+        const entry = tradeCharacter(deal.productName, deal.characterId);
+        const savedAskingPrice = Number(deal.askingPrice);
+        const listing = listingById.get(deal.listingId);
+        return {
+          ...deal,
+          askingPrice:Number.isFinite(savedAskingPrice) && savedAskingPrice > 0
+            ? savedAskingPrice
+            : (listing ? listing.askPrice : entry.product.price),
+          catalogPrice:entry.product.price,
+          stage:Math.floor(Math.max(0, Math.min(5, Number(deal.stage) || 0))),
+          cash:Math.max(0, Number(deal.cash) || 0),
+          delivery:deal.delivery === 'dropoff' ? 'dropoff' : 'courier',
+          offered:Array.isArray(deal.offered) ? deal.offered.filter(item=>
+            item && typeof item.purchaseId === 'string' && tradeCharacter(item.productName, item.characterId)
+          ) : [],
+        };
+      });
   }catch(error){
     console.error('Could not read active trade deals.', error);
     toast('Saved trade deals could not be read');
@@ -1111,7 +1122,7 @@ function renderTradePostModal(){
   const sellerHandle = signedIn ? `@${signedIn.split('@')[0].replace(/[^a-zA-Z0-9._-]/g, '').slice(0,24) || 'collector'}` : '@collector';
   openModal(`<div class="trade-form-panel">
     <span class="kicker">New marketplace listing</span><h3>Post a Trade / Sale Listing</h3>
-    <p class="modal-sub">Choose an exact character from your Collection or the existing catalog. Listing price and item details stay aligned with the catalog.</p>
+    <p class="modal-sub">Choose an exact character from your Collection or the existing catalog. Set your own asking price for For Sale or Trade or Buy listings.</p>
     <form id="tradePostForm">
       <label class="trade-field">Figure<select name="figure" required>
         ${owned.length ? `<optgroup label="Your Collection">${ownedOptions}</optgroup>` : ''}
@@ -1119,8 +1130,8 @@ function renderTradePostModal(){
       </select></label>
       <label class="trade-field">Listing type<select name="type" required><option value="trade">For Trade</option><option value="sale">For Sale</option><option value="trade-or-buy">Trade or Buy</option></select></label>
       <fieldset class="trade-field"><legend>Condition &amp; completeness</legend><div class="trade-check-grid">${TRADE_CONDITIONS.map((condition,index)=>`<label><input type="checkbox" name="conditions" value="${escAttr(condition)}" ${index === 0 ? 'checked' : ''}> ${escAttr(condition)}</label>`).join('')}</div></fieldset>
-      <label class="trade-field">Asking price (₱)<input name="price" type="number" value="${defaultEntry.product.price}" readonly aria-describedby="tradePriceNote"></label>
-      <small id="tradePriceNote" class="trade-field-note">Uses the selected figure’s exact catalog price.</small>
+      <label class="trade-field">Asking price (₱)<input name="price" type="number" min="1" step="1" value="${defaultEntry.product.price}" aria-describedby="tradePriceNote"></label>
+      <small id="tradePriceNote" class="trade-field-note">Pre-filled with catalog retail price (${peso(defaultEntry.product.price)}) — adjust to set your own asking price.</small>
       <label class="trade-field">ISO — select existing catalog figures <select name="iso" multiple size="5">${isoOptions}</select></label>
       <label class="trade-check"><input name="openOffers" type="checkbox" checked> Also open to other catalog offers</label>
       <button class="btn btn-primary" type="submit">Publish listing</button>
@@ -1131,7 +1142,11 @@ function renderTradePostModal(){
   if(defaultEntry) figureSelect.value = tradeKey(defaultEntry);
   figureSelect.addEventListener('change', ()=>{
     const entry = MARKETPLACE_BY_KEY.get(figureSelect.value);
-    if(entry) form.elements.price.value = entry.product.price;
+    if(entry){
+      form.elements.price.value = entry.product.price;
+      document.getElementById('tradePriceNote').textContent =
+        `Pre-filled with catalog retail price (${peso(entry.product.price)}) — adjust to set your own asking price.`;
+    }
   });
   form.addEventListener('submit', event=>{
     event.preventDefault();
@@ -1141,14 +1156,22 @@ function renderTradePostModal(){
       toast('Choose a catalog figure and at least one condition');
       return;
     }
+    const type = form.elements.type.value;
+    const enteredAskPrice = Number(form.elements.price.value);
+    if(['sale', 'trade-or-buy'].includes(type)
+      && (!Number.isFinite(enteredAskPrice) || enteredAskPrice <= 0)){
+      toast('Enter a valid asking price greater than ₱0');
+      form.elements.price.focus();
+      return;
+    }
     const selectedIso = [...form.elements.iso.selectedOptions].map(option=>option.value).filter(key=>MARKETPLACE_BY_KEY.has(key));
     const listings = loadTradeListings();
     listings.unshift({
       id:createLocalId('listing'),
       productName:entry.product.name,
       characterId:entry.character.id,
-      type:form.elements.type.value,
-      askPrice:entry.product.price,
+      type,
+      askPrice:Number.isFinite(enteredAskPrice) && enteredAskPrice > 0 ? enteredAskPrice : entry.product.price,
       conditions,
       seller:sellerHandle,
       verifiedDeals:0,
@@ -1187,10 +1210,15 @@ function renderTradeProposalModal(listingId, restoredState={}){
     .map(item=>`${item.character.name} · ${item.product.series}`);
   const requiresPurchase = listing.type === 'sale';
   const canBuy = listing.type !== 'trade';
-  const cashValue = restoredState.cash ?? (requiresPurchase ? entry.product.price : 0);
+  const cashValue = restoredState.cash ?? (requiresPurchase ? listing.askPrice : 0);
   const offerRows = owned.length ? owned.map((item,index)=>{
     const checked = (restoredState.offered || []).includes(item.purchaseId);
-    return `<label class="trade-offer-item"><input type="checkbox" name="offered" value="${escAttr(item.purchaseId)}" ${checked ? 'checked' : ''}><span>${escAttr(item.character.name)}<small>${escAttr(item.product.series)} · ${escAttr(item.character.rarity)} · Qty ${item.item.qty}</small></span><b>${peso(item.product.price)}</b></label>`;
+    return `<label class="trade-offer-item">
+      <input type="checkbox" name="offered" value="${escAttr(item.purchaseId)}" ${checked ? 'checked' : ''}>
+      <span class="trade-offer-thumb">${placeholderBox(item.character.name, item.character.image || item.product.image)}</span>
+      <span class="trade-offer-copy"><strong>${escAttr(item.character.name)}</strong><small>${escAttr(item.product.series)} · ${escAttr(item.character.rarity)} · Qty ${item.item.qty}</small></span>
+      <b class="trade-offer-price">${peso(item.product.price)}</b>
+    </label>`;
   }).join('') : `<p class="trade-empty-inline">Your Collection has no individually identified figures to offer yet. Add a revealed Box Pull figure to your Collection first.</p>`;
   const previewButton = entry.product.modelPreview && hasCharacterModel(entry.character.name)
     ? `<button type="button" class="btn btn-outline btn-sm" data-proposal-model>See 3D Model</button>`
@@ -1211,10 +1239,10 @@ function renderTradeProposalModal(listingId, restoredState={}){
       <form class="trade-proposal-offer" id="tradeProposalForm">
         <h4>Your offer</h4>
         <fieldset class="trade-field"><legend>Figures from your Collection</legend><div class="trade-offer-list">${offerRows}</div></fieldset>
-        ${canBuy ? `<label class="trade-check"><input type="checkbox" name="fullBuy" ${requiresPurchase || restoredState.fullBuy ? 'checked' : ''} ${requiresPurchase ? 'disabled' : ''}> Pay full asking price (${peso(entry.product.price)})</label>` : ''}
+        ${canBuy ? `<label class="trade-check"><input type="checkbox" name="fullBuy" ${requiresPurchase || restoredState.fullBuy ? 'checked' : ''} ${requiresPurchase ? 'disabled' : ''}> Pay full asking price (${peso(listing.askPrice)})</label>` : ''}
         <label class="trade-field">Cash top-up / payment (₱)<input name="cash" type="number" min="0" step="1" value="${Number(cashValue) || 0}" ${requiresPurchase || restoredState.fullBuy ? 'disabled' : ''}></label>
         <label class="trade-field">Delivery method<select name="delivery"><option value="courier" ${restoredState.delivery !== 'dropoff' ? 'selected' : ''}>Courier to Joy Trinkets Hub</option><option value="dropoff" ${restoredState.delivery === 'dropoff' ? 'selected' : ''}>Drop Off In-Store</option></select></label>
-        <div class="trade-escrow-breakdown"><b>Legit Check &amp; Escrow Protection</b><span>Catalog target: ${peso(entry.product.price)}</span><span>Offer cash: <strong data-offer-cash>${peso(Number(cashValue) || 0)}</strong></span><span>Hub check &amp; escrow fee: Confirmed at handoff; not charged in this demo</span><small>No payment is collected on this static demo. Figures transfer to Collection only after the final tracker step.</small></div>
+        <div class="trade-escrow-breakdown"><b>Legit Check &amp; Escrow Protection</b><span>Seller asking price: ${peso(listing.askPrice)}</span><span>Catalog retail reference: ${peso(entry.product.price)}</span><span>Offer cash: <strong data-offer-cash>${peso(Number(cashValue) || 0)}</strong></span><span>Hub check &amp; escrow fee: Confirmed at handoff; not charged in this demo</span><small>No payment is collected on this static demo. Figures transfer to Collection only after the final tracker step.</small></div>
         <button class="btn btn-primary" type="submit">Send offer to seller</button>
       </form>
     </div>
@@ -1225,7 +1253,7 @@ function renderTradeProposalModal(listingId, restoredState={}){
   const cashDisplay = form.querySelector('[data-offer-cash]');
   const syncPayment = ()=>{
     const fullPayment = Boolean(fullBuy && fullBuy.checked);
-    if(fullPayment) cashInput.value = entry.product.price;
+    if(fullPayment) cashInput.value = listing.askPrice;
     cashInput.disabled = requiresPurchase || fullPayment;
     cashDisplay.textContent = peso(Number(cashInput.value) || 0);
   };
@@ -1245,7 +1273,7 @@ function renderTradeProposalModal(listingId, restoredState={}){
     const currentOwned = ownedTradeCharacters();
     const offered = offeredIds.map(id=>currentOwned.find(item=>item.purchaseId === id)).filter(Boolean)
       .map(item=>({purchaseId:item.purchaseId, productName:item.product.name, characterId:item.character.id}));
-    const cash = requiresPurchase || fullPayment ? entry.product.price : Math.max(0, Number(cashInput.value) || 0);
+    const cash = requiresPurchase || fullPayment ? listing.askPrice : Math.max(0, Number(cashInput.value) || 0);
     if(!requiresPurchase && !offered.length && cash <= 0){
       toast('Choose a Collection figure or enter a cash top-up');
       return;
@@ -1256,6 +1284,8 @@ function renderTradeProposalModal(listingId, restoredState={}){
       listingId:listing.id,
       productName:entry.product.name,
       characterId:entry.character.id,
+      askingPrice:listing.askPrice,
+      catalogPrice:entry.product.price,
       offered,
       cash,
       delivery:form.elements.delivery.value,
@@ -1336,7 +1366,7 @@ function renderTradeDeals(){
     }).filter(Boolean);
     const currentStage = deal.stage === 0 ? 'Pending seller agreement' : TRADE_STAGES[deal.stage - 1];
     return `<article class="trade-deal-card">
-      <div class="trade-deal-summary">${listingImage(entry)}<div><span class="kicker">${deal.stage === 5 ? 'Completed deal' : 'Active deal'}</span><h4>${escAttr(entry.character.name)}</h4><p>${escAttr(entry.product.series)} · ${peso(entry.product.price)}</p></div><span class="trade-deal-status">${escAttr(currentStage)}</span></div>
+      <div class="trade-deal-summary">${listingImage(entry)}<div><span class="kicker">${deal.stage === 5 ? 'Completed deal' : 'Active deal'}</span><h4>${escAttr(entry.character.name)}</h4><p>${escAttr(entry.product.series)} · Asking ${peso(deal.askingPrice)} · Catalog ${peso(entry.product.price)}</p></div><span class="trade-deal-status">${escAttr(currentStage)}</span></div>
       <div class="trade-deal-meta"><span>Offer: ${offeredText.length ? offeredText.map(escAttr).join(', ') : 'Cash only'}${deal.cash ? ` + ${peso(deal.cash)}` : ''}</span><span>Delivery: ${deal.delivery === 'dropoff' ? 'Drop Off In-Store' : 'Courier to Joy Trinkets Hub'}</span></div>
       <ol class="trade-stage-list">${TRADE_STAGES.map((stage,index)=>`<li class="${deal.stage > index ? 'complete' : deal.stage === index + 1 ? 'current' : ''}"><span>${index + 1}</span><div><b>${escAttr(stage)}</b>${index === 2 ? '<small>Authentic sculpt, paint, foil/box and collector ID card review</small>' : ''}</div></li>`).join('')}</ol>
       <button class="btn btn-outline btn-sm" type="button" data-trade-next="${escAttr(deal.id)}" ${deal.stage >= 5 ? 'disabled' : ''}>${deal.stage === 0 ? 'Simulate Next Legit Check Step' : deal.stage >= 5 ? 'Deal completed' : 'Simulate Next Legit Check Step'}</button>
@@ -1666,7 +1696,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
         return;
       }
       list.forEach(p=>{
-        const soldOut = p.tag === 'tag-soldout';
         const card = document.createElement('div');
         card.className = 'product-card';
         card.tabIndex = 0;
@@ -1683,12 +1712,13 @@ document.addEventListener('DOMContentLoaded', ()=>{
           <div class="product-view-cue">View characters →</div>
           <div class="product-foot">
             <span class="price">${peso(p.price)}</span>
-            <button class="add-btn" ${soldOut ? 'disabled' : ''} aria-label="Add ${escAttr(p.name)} to cart">${soldOut ? 'Sold out' : 'Add to Cart'}</button>
+            <button class="product-select-link" type="button" aria-label="View characters in ${escAttr(p.name)}">Select series →</button>
           </div>`;
-        const addButton = card.querySelector('.add-btn');
-        addButton.addEventListener('click', event=>{ event.stopPropagation(); addToCart(p); });
+        card.querySelector('.product-select-link').addEventListener('click', event=>{
+          event.stopPropagation();
+          renderCharacterModal(p);
+        });
         card.addEventListener('click', event=>{
-          if(event.target.closest('.add-btn')) return;
           renderCharacterModal(p);
         });
         card.addEventListener('keydown', event=>{
